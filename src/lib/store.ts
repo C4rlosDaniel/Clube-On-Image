@@ -19,29 +19,6 @@ export type Presentation = {
   loop: boolean;
   description?: string;
   transition?: "fade" | "zoom" | "slide" | "push";
-  layoutId?: string | null;
-  zones?: Record<string, ZoneBinding>;
-};
-
-export type ZoneBinding = {
-  mediaIds: string[];
-  durationMs: number;
-};
-
-export type LayoutZone = {
-  key: string;
-  x: number; // percent 0-100
-  y: number;
-  w: number;
-  h: number;
-};
-
-export type Layout = {
-  id: string;
-  name: string;
-  description: string;
-  zones: LayoutZone[];
-  isBuiltin: boolean;
 };
 
 export type Terminal = {
@@ -58,7 +35,6 @@ export type AppState = {
   media: Media[];
   presentations: Presentation[];
   terminals: Terminal[];
-  layouts: Layout[];
   ready: boolean;
   autoDeleteEnabled: boolean;
 };
@@ -66,13 +42,13 @@ export type AppState = {
 const BUCKET = "media";
 const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
-const state: AppState = { media: [], presentations: [], terminals: [], layouts: [], ready: false, autoDeleteEnabled: false };
+const state: AppState = { media: [], presentations: [], terminals: [], ready: false, autoDeleteEnabled: false };
 const listeners = new Set<(s: AppState) => void>();
 let initStarted = false;
 let initPromise: Promise<void> | null = null;
 
 function emit() {
-  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], layouts: [...state.layouts] };
+  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals] };
   listeners.forEach((l) => l(snap));
 }
 
@@ -106,18 +82,6 @@ function mapPres(row: any): Presentation {
     loop: row.loop ?? true,
     description: row.description ?? "",
     transition: row.transition ?? "fade",
-    layoutId: row.layout_id ?? null,
-    zones: (row.zones ?? {}) as Record<string, ZoneBinding>,
-  };
-}
-
-function mapLayout(row: any): Layout {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? "",
-    zones: Array.isArray(row.zones) ? row.zones : [],
-    isBuiltin: !!row.is_builtin,
   };
 }
 
@@ -138,18 +102,16 @@ async function init() {
   if (initStarted) return initPromise!;
   initStarted = true;
   initPromise = (async () => {
-    const [mRes, pRes, tRes, sRes, lRes] = await Promise.all([
+    const [mRes, pRes, tRes, sRes] = await Promise.all([
       supabase.from("media").select("*").order("created_at", { ascending: false }),
       supabase.from("presentations").select("*").order("created_at", { ascending: false }),
       supabase.from("terminals").select("*").order("created_at", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", true).maybeSingle(),
-      supabase.from("layouts").select("*").order("created_at", { ascending: true }),
     ]);
     if (mRes.data) state.media = await Promise.all(mRes.data.map(mapMediaRow));
     if (pRes.data) state.presentations = pRes.data.map(mapPres);
     if (tRes.data) state.terminals = tRes.data.map(mapTerm);
     if (sRes.data) state.autoDeleteEnabled = !!sRes.data.auto_delete_enabled;
-    if (lRes.data) state.layouts = lRes.data.map(mapLayout);
     state.ready = true;
     emit();
 
@@ -212,21 +174,6 @@ async function init() {
         runRetentionSweep();
       })
       .subscribe();
-
-    supabase
-      .channel("ccp-layouts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "layouts" }, (payload) => {
-        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-          const l = mapLayout(payload.new);
-          const idx = state.layouts.findIndex((x) => x.id === l.id);
-          if (idx >= 0) state.layouts[idx] = l;
-          else state.layouts.push(l);
-        } else if (payload.eventType === "DELETE") {
-          state.layouts = state.layouts.filter((x) => x.id !== (payload.old as any).id);
-        }
-        emit();
-      })
-      .subscribe();
   })();
   return initPromise;
 }
@@ -251,7 +198,7 @@ export async function deleteMediaBulk(ids: string[]) {
 }
 
 export function useStore(): AppState {
-  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], layouts: [...state.layouts] }));
+  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals] }));
   useEffect(() => {
     const l = (n: AppState) => setS(n);
     listeners.add(l);
@@ -325,8 +272,6 @@ export async function updatePresentation(id: string, patch: Partial<Presentation
   if (patch.loop !== undefined) dbPatch.loop = patch.loop;
   if (patch.description !== undefined) dbPatch.description = patch.description;
   if (patch.transition !== undefined) dbPatch.transition = patch.transition;
-  if (patch.layoutId !== undefined) dbPatch.layout_id = patch.layoutId;
-  if (patch.zones !== undefined) dbPatch.zones = patch.zones;
   await supabase.from("presentations").update(dbPatch).eq("id", id);
 }
 
