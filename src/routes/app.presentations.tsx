@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Eye, Pencil, Check, X, Upload, Image as ImageIcon, Film, ChevronRight, Save, Loader2 } from "lucide-react";
-import { useStore, createPresentation, updatePresentation, deletePresentation, addMedia, type Media, type Presentation } from "@/lib/store";
+import { useStore, createPresentation, updatePresentation, deletePresentation, addMedia, type Media, type Presentation, type Layout, type ZoneBinding } from "@/lib/store";
 import { dialog } from "@/components/PremiumDialog";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/RichTextEditor";
@@ -9,7 +9,7 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 export const Route = createFileRoute("/app/presentations")({ component: Pres });
 
 function Pres() {
-  const { presentations, media } = useStore();
+  const { presentations, media, layouts } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(presentations[0]?.id ?? null);
   const selected = presentations.find((p) => p.id === selectedId) ?? null;
 
@@ -44,13 +44,13 @@ function Pres() {
         </div>
       </aside>
       <section>
-        {selected ? <Editor key={selected.id} pres={selected} media={media} /> : <div className="premium-border p-16 text-center text-muted-foreground">Selecione ou crie uma apresentação.</div>}
+        {selected ? <Editor key={selected.id} pres={selected} media={media} layouts={layouts} /> : <div className="premium-border p-16 text-center text-muted-foreground">Selecione ou crie uma apresentação.</div>}
       </section>
     </div>
   );
 }
 
-function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
+function Editor({ pres, media, layouts }: { pres: Presentation; media: Media[]; layouts: Layout[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(pres.name);
@@ -63,6 +63,24 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(pres);
 
   const items = draft.mediaIds.map((id) => media.find((m) => m.id === id)).filter(Boolean) as Media[];
+
+  const currentLayout = draft.layoutId ? layouts.find((l) => l.id === draft.layoutId) ?? null : null;
+  const isMultiZone = !!currentLayout && currentLayout.zones.length > 1;
+
+  const changeLayout = (layoutId: string | "") => {
+    const nextLayout = layoutId ? layouts.find((l) => l.id === layoutId) ?? null : null;
+    setDraft((d) => {
+      // Preserve bindings only for zones still present in the new layout (safe redistribute)
+      const keep: Record<string, ZoneBinding> = {};
+      const validKeys = new Set((nextLayout?.zones ?? []).map((z) => z.key));
+      Object.entries(d.zones ?? {}).forEach(([k, v]) => { if (validKeys.has(k)) keep[k] = v; });
+      // If moving from fullscreen (no layout) to multi-zone, seed Zone A with the existing mediaIds
+      if (!d.layoutId && nextLayout && nextLayout.zones.length > 1 && !keep["A"] && d.mediaIds.length) {
+        keep["A"] = { mediaIds: [...d.mediaIds], durationMs: d.durationMs };
+      }
+      return { ...d, layoutId: nextLayout?.id ?? null, zones: keep };
+    });
+  };
 
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -84,6 +102,8 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
         loop: draft.loop,
         description: draft.description,
         transition: draft.transition,
+        layoutId: draft.layoutId ?? null,
+        zones: draft.zones ?? {},
       });
       toast.success("Apresentação salva e sincronizada");
     } catch (e) {
@@ -124,6 +144,17 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
             <option value="slide">Slide</option>
             <option value="push">Push</option>
           </select>
+          <label className="text-xs text-muted-foreground ml-3">Layout:</label>
+          <select
+            value={draft.layoutId ?? ""}
+            onChange={(e) => changeLayout(e.target.value)}
+            className="rounded border bg-background px-2 py-1 text-xs"
+          >
+            <option value="">Tela cheia (padrão)</option>
+            {layouts.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
@@ -145,6 +176,7 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
         />
       </div>
 
+      {!isMultiZone && (<>
       <div className="flex items-center gap-2">
         <input ref={inputRef} type="file" multiple accept="image/*,video/mp4" className="hidden" onChange={(e) => onUpload(e.target.files)} />
         <button onClick={() => inputRef.current?.click()} disabled={uploading} className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
@@ -195,10 +227,177 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
           </div>
         )}
       </div>
+      </>)}
+
+      {isMultiZone && currentLayout && (
+        <ZonesEditor
+          layout={currentLayout}
+          draft={draft}
+          setDraft={setDraft}
+          media={media}
+          setPreview={setPreview}
+        />
+      )}
 
       {preview && (
         <div onClick={() => setPreview(null)} className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-8 cursor-zoom-out">
           {preview.type === "image" ? <img src={preview.url} className="max-h-full max-w-full object-contain" alt="" /> : <video src={preview.url} className="max-h-full max-w-full" controls autoPlay />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ZonesEditor({ layout, draft, setDraft, media, setPreview }: {
+  layout: Layout;
+  draft: Presentation;
+  setDraft: React.Dispatch<React.SetStateAction<Presentation>>;
+  media: Media[];
+  setPreview: (m: Media | null) => void;
+}) {
+  const setZone = (key: string, patch: Partial<ZoneBinding>) => {
+    setDraft((d) => {
+      const cur = d.zones?.[key] ?? { mediaIds: [], durationMs: d.durationMs };
+      return { ...d, zones: { ...(d.zones ?? {}), [key]: { ...cur, ...patch } } };
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-semibold">Layout: {layout.name}</h3>
+        <p className="text-xs text-muted-foreground">{layout.description}</p>
+      </div>
+
+      {/* Visual layout preview */}
+      <div className="relative w-full max-w-md aspect-video rounded-lg border-2 border-dashed border-primary/40 bg-black/40 overflow-hidden">
+        {layout.zones.map((z) => (
+          <div
+            key={z.key}
+            className="absolute border border-primary/50 bg-primary/10 flex items-center justify-center text-white/70 text-xs font-bold"
+            style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.w}%`, height: `${z.h}%` }}
+          >
+            Zona {z.key}
+          </div>
+        ))}
+      </div>
+
+      <div className={`grid gap-4 ${layout.zones.length > 1 ? "md:grid-cols-2" : ""}`}>
+        {layout.zones.map((z) => {
+          const binding = draft.zones?.[z.key] ?? { mediaIds: [], durationMs: draft.durationMs };
+          return (
+            <ZoneCard
+              key={z.key}
+              zoneKey={z.key}
+              binding={binding}
+              media={media}
+              onChange={(patch) => setZone(z.key, patch)}
+              setPreview={setPreview}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ZoneCard({ zoneKey, binding, media, onChange, setPreview }: {
+  zoneKey: string;
+  binding: ZoneBinding;
+  media: Media[];
+  onChange: (patch: Partial<ZoneBinding>) => void;
+  setPreview: (m: Media | null) => void;
+}) {
+  const [showLib, setShowLib] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const items = binding.mediaIds.map((id) => media.find((m) => m.id === id)).filter(Boolean) as Media[];
+
+  const onUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const added = await addMedia(files);
+      onChange({ mediaIds: [...binding.mediaIds, ...added.map((a) => a.id)] });
+      toast.success(`${added.length} mídia(s) enviada(s) para Zona ${zoneKey}`);
+    } finally { setUploading(false); }
+  };
+
+  const removeAt = async (idx: number) => {
+    if (await dialog.confirm({ title: `Remover da Zona ${zoneKey}?`, description: "A mídia continua disponível na biblioteca.", confirmLabel: "Remover", destructive: true })) {
+      onChange({ mediaIds: binding.mediaIds.filter((_, i) => i !== idx) });
+    }
+  };
+
+  return (
+    <div className="premium-border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold flex items-center gap-2">
+          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">{zoneKey}</span>
+          Zona {zoneKey}
+          <span className="text-xs font-normal text-muted-foreground">({items.length} mídia{items.length !== 1 ? "s" : ""})</span>
+        </h4>
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground">Duração (s):</span>
+          <input
+            type="number"
+            min={1}
+            value={binding.durationMs / 1000}
+            onChange={(e) => onChange({ durationMs: Math.max(1, Number(e.target.value)) * 1000 })}
+            className="w-16 rounded border px-2 py-1"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <input ref={inputRef} type="file" multiple accept="image/*,video/mp4" className="hidden" onChange={(e) => onUpload(e.target.files)} />
+        <button onClick={() => inputRef.current?.click()} disabled={uploading} className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50">
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />} {uploading ? "Enviando..." : "Upload"}
+        </button>
+        <button onClick={() => setShowLib((v) => !v)} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium">
+          {showLib ? "Ocultar Biblioteca" : "Adicionar da Biblioteca"}
+        </button>
+      </div>
+
+      {showLib && (
+        <div className="rounded-lg border p-3 bg-card max-h-64 overflow-auto">
+          <div className="grid grid-cols-3 gap-2">
+            {media.map((m) => {
+              const added = binding.mediaIds.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => onChange({ mediaIds: added ? binding.mediaIds.filter((x) => x !== m.id) : [...binding.mediaIds, m.id] })}
+                  className={`relative aspect-video overflow-hidden rounded border-2 ${added ? "border-primary" : "border-transparent"}`}
+                >
+                  {m.type === "image" ? <img src={m.url} alt="" className="w-full h-full object-cover" /> : <video src={m.url} className="w-full h-full object-cover" muted />}
+                  {added && <div className="absolute inset-0 bg-primary/30 flex items-center justify-center"><Check className="h-5 w-5 text-white" /></div>}
+                </button>
+              );
+            })}
+            {!media.length && <p className="col-span-full text-xs text-muted-foreground text-center py-4">Biblioteca vazia.</p>}
+          </div>
+        </div>
+      )}
+
+      {items.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground text-xs">Nenhuma mídia nesta zona.</div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {items.map((m, idx) => (
+            <div key={m.id + idx} className="group rounded border bg-card overflow-hidden">
+              <div className="relative aspect-video bg-black">
+                {m.type === "image" ? <img src={m.url} className="w-full h-full object-cover" alt="" /> : <video src={m.url} className="w-full h-full object-cover" muted />}
+                <button onClick={() => setPreview(m)} className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition">
+                  <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                </button>
+                <span className="absolute top-1 left-1 rounded bg-black/70 text-white text-[10px] px-1.5 py-0.5">#{idx + 1}</span>
+                <button onClick={() => removeAt(idx)} className="absolute top-1 right-1 rounded bg-black/70 hover:bg-destructive text-white p-1">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
