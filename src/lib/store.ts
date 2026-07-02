@@ -354,3 +354,44 @@ export async function pingTerminal(terminalId: string) {
   const next = (t?.refreshToken ?? 0) + 1;
   await supabase.from("terminals").update({ refresh_token: next, last_sync: new Date().toISOString() }).eq("id", terminalId);
 }
+
+// ====== Ticker messages ======
+export async function createTickerMessage(patch: Partial<TickerMessage> & { text: string }) {
+  const orderIndex = (state.tickerMessages.reduce((m, x) => Math.max(m, x.orderIndex), 0) ?? 0) + 1;
+  const row: any = {
+    text: patch.text,
+    label: patch.label ?? "AVISO",
+    color: patch.color ?? "#dc2626",
+    priority: patch.priority ?? false,
+    active: patch.active ?? true,
+    order_index: patch.orderIndex ?? orderIndex,
+    starts_at: patch.startsAt ? new Date(patch.startsAt).toISOString() : null,
+    ends_at: patch.endsAt ? new Date(patch.endsAt).toISOString() : null,
+    terminal_ids: patch.terminalIds ?? [],
+  };
+  const ins = await supabase.from("ticker_messages").insert(row).select().single();
+  if (ins.error) console.error(ins.error);
+  return ins.data?.id ?? null;
+}
+
+export async function updateTickerMessage(id: string, patch: Partial<TickerMessage>) {
+  const db: any = {};
+  if (patch.text !== undefined) db.text = patch.text;
+  if (patch.label !== undefined) db.label = patch.label;
+  if (patch.color !== undefined) db.color = patch.color;
+  if (patch.priority !== undefined) db.priority = patch.priority;
+  if (patch.active !== undefined) db.active = patch.active;
+  if (patch.orderIndex !== undefined) db.order_index = patch.orderIndex;
+  if (patch.startsAt !== undefined) db.starts_at = patch.startsAt ? new Date(patch.startsAt).toISOString() : null;
+  if (patch.endsAt !== undefined) db.ends_at = patch.endsAt ? new Date(patch.endsAt).toISOString() : null;
+  if (patch.terminalIds !== undefined) db.terminal_ids = patch.terminalIds;
+  await supabase.from("ticker_messages").update(db).eq("id", id);
+}
+
+export async function deleteTickerMessage(id: string) {
+  await supabase.from("ticker_messages").delete().eq("id", id);
+}
+
+export async function reorderTickerMessages(orderedIds: string[]) {
+  await Promise.all(orderedIds.map((id, i) => updateTickerMessage(id, { orderIndex: i })));
+}
