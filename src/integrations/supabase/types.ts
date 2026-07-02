@@ -32,6 +32,36 @@ export type Database = {
         }
         Relationships: []
       }
+      layouts: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_builtin: boolean
+          name: string
+          updated_at: string
+          zones: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_builtin?: boolean
+          name: string
+          updated_at?: string
+          zones?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_builtin?: boolean
+          name?: string
+          updated_at?: string
+          zones?: Json
+        }
+        Relationships: []
+      }
       media: {
         Row: {
           created_at: string
@@ -65,35 +95,49 @@ export type Database = {
           description: string
           duration_ms: number
           id: string
+          layout_id: string | null
           loop: boolean
           media_ids: string[]
           name: string
           transition: string
           updated_at: string
+          zones: Json
         }
         Insert: {
           created_at?: string
           description?: string
           duration_ms?: number
           id?: string
+          layout_id?: string | null
           loop?: boolean
           media_ids?: string[]
           name: string
           transition?: string
           updated_at?: string
+          zones?: Json
         }
         Update: {
           created_at?: string
           description?: string
           duration_ms?: number
           id?: string
+          layout_id?: string | null
           loop?: boolean
           media_ids?: string[]
           name?: string
           transition?: string
           updated_at?: string
+          zones?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "presentations_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "layouts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       terminals: {
         Row: {
