@@ -149,6 +149,7 @@ export type Database = {
           presentation_id: string | null
           refresh_token: number
           resolution: string
+          show_ticker: boolean
         }
         Insert: {
           active?: boolean
@@ -159,6 +160,7 @@ export type Database = {
           presentation_id?: string | null
           refresh_token?: number
           resolution?: string
+          show_ticker?: boolean
         }
         Update: {
           active?: boolean
@@ -169,6 +171,7 @@ export type Database = {
           presentation_id?: string | null
           refresh_token?: number
           resolution?: string
+          show_ticker?: boolean
         }
         Relationships: [
           {
@@ -179,6 +182,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ticker_messages: {
+        Row: {
+          active: boolean
+          color: string
+          created_at: string
+          ends_at: string | null
+          id: string
+          label: string
+          order_index: number
+          priority: boolean
+          starts_at: string | null
+          terminal_ids: string[]
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          color?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          label?: string
+          order_index?: number
+          priority?: boolean
+          starts_at?: string | null
+          terminal_ids?: string[]
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          color?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          label?: string
+          order_index?: number
+          priority?: boolean
+          starts_at?: string | null
+          terminal_ids?: string[]
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
