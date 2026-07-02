@@ -274,3 +274,14 @@
   box-shadow: 0 0 0 3px rgba(255,255,255,0.12), 0 10px 30px -10px oklch(0.58 0.21 27 / 0.6);
   transform: translateY(-1px);
 }
+
+/* News ticker */
+@keyframes ccp-ticker-scroll {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+.ccp-ticker-track {
+  animation-name: ccp-ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}

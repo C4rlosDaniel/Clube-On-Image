@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PresentationPlayer } from "@/components/PresentationPlayer";
+import { TickerBar } from "@/components/TickerBar";
 
 export const Route = createFileRoute("/app/preview")({ component: Prev });
 
@@ -34,8 +35,9 @@ function Prev() {
 
       {pres ? (
         <div className="flex justify-center ccp-anim-zoom">
-          <div className={`premium-border-gradient bg-black shadow-2xl overflow-hidden ${orient === "h" ? "w-full max-w-4xl aspect-video" : "h-[70vh] aspect-[9/16]"}`}>
+          <div className={`relative premium-border-gradient bg-black shadow-2xl overflow-hidden ${orient === "h" ? "w-full max-w-4xl aspect-video" : "h-[70vh] aspect-[9/16]"}`}>
             <PresentationPlayer presentationId={presId} />
+            <TickerBar />
           </div>
         </div>
       ) : (

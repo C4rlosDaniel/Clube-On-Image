@@ -29,12 +29,28 @@ export type Terminal = {
   resolution: string;
   refreshToken: number;
   lastSync: number;
+  showTicker: boolean;
+};
+
+export type TickerMessage = {
+  id: string;
+  text: string;
+  label: string;
+  color: string;
+  priority: boolean;
+  active: boolean;
+  orderIndex: number;
+  startsAt: number | null;
+  endsAt: number | null;
+  terminalIds: string[]; // empty = all
+  createdAt: number;
 };
 
 export type AppState = {
   media: Media[];
   presentations: Presentation[];
   terminals: Terminal[];
+  tickerMessages: TickerMessage[];
   ready: boolean;
   autoDeleteEnabled: boolean;
 };
@@ -42,13 +58,13 @@ export type AppState = {
 const BUCKET = "media";
 const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
-const state: AppState = { media: [], presentations: [], terminals: [], ready: false, autoDeleteEnabled: false };
+const state: AppState = { media: [], presentations: [], terminals: [], tickerMessages: [], ready: false, autoDeleteEnabled: false };
 const listeners = new Set<(s: AppState) => void>();
 let initStarted = false;
 let initPromise: Promise<void> | null = null;
 
 function emit() {
-  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals] };
+  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages] };
   listeners.forEach((l) => l(snap));
 }
 
@@ -94,6 +110,23 @@ function mapTerm(row: any): Terminal {
     resolution: row.resolution,
     refreshToken: Number(row.refresh_token ?? 0),
     lastSync: new Date(row.last_sync).getTime(),
+    showTicker: row.show_ticker ?? true,
+  };
+}
+
+function mapTicker(row: any): TickerMessage {
+  return {
+    id: row.id,
+    text: row.text,
+    label: row.label ?? "AVISO",
+    color: row.color ?? "#dc2626",
+    priority: !!row.priority,
+    active: !!row.active,
+    orderIndex: row.order_index ?? 0,
+    startsAt: row.starts_at ? new Date(row.starts_at).getTime() : null,
+    endsAt: row.ends_at ? new Date(row.ends_at).getTime() : null,
+    terminalIds: row.terminal_ids ?? [],
+    createdAt: new Date(row.created_at).getTime(),
   };
 }
 
@@ -102,16 +135,18 @@ async function init() {
   if (initStarted) return initPromise!;
   initStarted = true;
   initPromise = (async () => {
-    const [mRes, pRes, tRes, sRes] = await Promise.all([
+    const [mRes, pRes, tRes, sRes, kRes] = await Promise.all([
       supabase.from("media").select("*").order("created_at", { ascending: false }),
       supabase.from("presentations").select("*").order("created_at", { ascending: false }),
       supabase.from("terminals").select("*").order("created_at", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", true).maybeSingle(),
+      supabase.from("ticker_messages").select("*").order("order_index", { ascending: true }),
     ]);
     if (mRes.data) state.media = await Promise.all(mRes.data.map(mapMediaRow));
     if (pRes.data) state.presentations = pRes.data.map(mapPres);
     if (tRes.data) state.terminals = tRes.data.map(mapTerm);
     if (sRes.data) state.autoDeleteEnabled = !!sRes.data.auto_delete_enabled;
+    if (kRes.data) state.tickerMessages = kRes.data.map(mapTicker);
     state.ready = true;
     emit();
 
@@ -174,6 +209,22 @@ async function init() {
         runRetentionSweep();
       })
       .subscribe();
+
+    supabase
+      .channel("ccp-ticker")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_messages" }, (payload) => {
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          const m = mapTicker(payload.new);
+          const idx = state.tickerMessages.findIndex((x) => x.id === m.id);
+          if (idx >= 0) state.tickerMessages[idx] = m;
+          else state.tickerMessages.push(m);
+          state.tickerMessages.sort((a, b) => a.orderIndex - b.orderIndex);
+        } else if (payload.eventType === "DELETE") {
+          state.tickerMessages = state.tickerMessages.filter((x) => x.id !== (payload.old as any).id);
+        }
+        emit();
+      })
+      .subscribe();
   })();
   return initPromise;
 }
@@ -198,7 +249,7 @@ export async function deleteMediaBulk(ids: string[]) {
 }
 
 export function useStore(): AppState {
-  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals] }));
+  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages] }));
   useEffect(() => {
     const l = (n: AppState) => setS(n);
     listeners.add(l);
@@ -289,6 +340,7 @@ export async function updateTerminal(id: string, patch: Partial<Terminal>) {
   if (patch.presentationId !== undefined) dbPatch.presentation_id = patch.presentationId;
   if (patch.active !== undefined) dbPatch.active = patch.active;
   if (patch.resolution !== undefined) dbPatch.resolution = patch.resolution;
+  if (patch.showTicker !== undefined) dbPatch.show_ticker = patch.showTicker;
   await supabase.from("terminals").update(dbPatch).eq("id", id);
 }
 
@@ -301,4 +353,45 @@ export async function pingTerminal(terminalId: string) {
   const t = state.terminals.find((x) => x.id === terminalId);
   const next = (t?.refreshToken ?? 0) + 1;
   await supabase.from("terminals").update({ refresh_token: next, last_sync: new Date().toISOString() }).eq("id", terminalId);
+}
+
+// ====== Ticker messages ======
+export async function createTickerMessage(patch: Partial<TickerMessage> & { text: string }) {
+  const orderIndex = (state.tickerMessages.reduce((m, x) => Math.max(m, x.orderIndex), 0) ?? 0) + 1;
+  const row: any = {
+    text: patch.text,
+    label: patch.label ?? "AVISO",
+    color: patch.color ?? "#dc2626",
+    priority: patch.priority ?? false,
+    active: patch.active ?? true,
+    order_index: patch.orderIndex ?? orderIndex,
+    starts_at: patch.startsAt ? new Date(patch.startsAt).toISOString() : null,
+    ends_at: patch.endsAt ? new Date(patch.endsAt).toISOString() : null,
+    terminal_ids: patch.terminalIds ?? [],
+  };
+  const ins = await supabase.from("ticker_messages").insert(row).select().single();
+  if (ins.error) console.error(ins.error);
+  return ins.data?.id ?? null;
+}
+
+export async function updateTickerMessage(id: string, patch: Partial<TickerMessage>) {
+  const db: any = {};
+  if (patch.text !== undefined) db.text = patch.text;
+  if (patch.label !== undefined) db.label = patch.label;
+  if (patch.color !== undefined) db.color = patch.color;
+  if (patch.priority !== undefined) db.priority = patch.priority;
+  if (patch.active !== undefined) db.active = patch.active;
+  if (patch.orderIndex !== undefined) db.order_index = patch.orderIndex;
+  if (patch.startsAt !== undefined) db.starts_at = patch.startsAt ? new Date(patch.startsAt).toISOString() : null;
+  if (patch.endsAt !== undefined) db.ends_at = patch.endsAt ? new Date(patch.endsAt).toISOString() : null;
+  if (patch.terminalIds !== undefined) db.terminal_ids = patch.terminalIds;
+  await supabase.from("ticker_messages").update(db).eq("id", id);
+}
+
+export async function deleteTickerMessage(id: string) {
+  await supabase.from("ticker_messages").delete().eq("id", id);
+}
+
+export async function reorderTickerMessages(orderedIds: string[]) {
+  await Promise.all(orderedIds.map((id, i) => updateTickerMessage(id, { orderIndex: i })));
 }

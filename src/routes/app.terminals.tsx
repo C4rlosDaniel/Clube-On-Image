@@ -114,6 +114,16 @@ function Terms() {
               </div>
               <p className="text-xs text-muted-foreground truncate">Mídias: {pres ? pres.mediaIds.length : 0}</p>
 
+              <label className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+                <span className="text-muted-foreground">Exibir faixa de notícias</span>
+                <input
+                  type="checkbox"
+                  checked={t.showTicker}
+                  onChange={(e) => updateTerminal(t.id, { showTicker: e.target.checked })}
+                  className="h-4 w-4 accent-primary"
+                />
+              </label>
+
               <div className="flex gap-2 flex-wrap">
                 <button onClick={() => openTerminal(t.id)} className="flex-1 flex items-center justify-center gap-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-xs font-medium">
                   <ExternalLink className="h-3 w-3" /> Abrir

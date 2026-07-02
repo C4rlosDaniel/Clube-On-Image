@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { LogOut, Pin, PinOff } from "lucide-react";
 import { useStore, setSession } from "@/lib/store";
 import { PresentationPlayer } from "@/components/PresentationPlayer";
+import { TickerBar } from "@/components/TickerBar";
 import logo from "@/assets/logo.png";
 import { toast } from "sonner";
 
@@ -93,6 +94,9 @@ function TerminalScreen() {
   return (
     <div onClick={toggleFs} className="h-screen w-screen bg-black overflow-hidden cursor-pointer relative">
       <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
+
+      {/* News ticker overlay - independent from player */}
+      <TickerBar terminalId={terminal.id} />
 
       {/* Marca d'água: somente o logo */}
       <div className="pointer-events-none absolute bottom-4 right-4 rounded-full bg-white/90 p-1 shadow-lg opacity-70">
