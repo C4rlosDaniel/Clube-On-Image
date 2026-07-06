@@ -53,18 +53,44 @@ export type AppState = {
   tickerMessages: TickerMessage[];
   ready: boolean;
   autoDeleteEnabled: boolean;
+  tickerSettings: TickerSettings;
+};
+
+export type TickerSettings = {
+  heightPx: number;
+  fontFamily: string;
+  fontMin: number;
+  fontMax: number;
+  bgColor: string;
+  bgOpacity: number;
+};
+
+export const TICKER_HEIGHT_MIN = 44;
+// 5cm at 96dpi ≈ 189px. This is the enforced maximum height for the ticker.
+export const TICKER_HEIGHT_MAX = 189;
+
+const DEFAULT_TICKER: TickerSettings = {
+  heightPx: 96,
+  fontFamily: "Roboto",
+  fontMin: 12,
+  fontMax: 24,
+  bgColor: "#ffffff",
+  bgOpacity: 0.95,
 };
 
 const BUCKET = "media";
 const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
-const state: AppState = { media: [], presentations: [], terminals: [], tickerMessages: [], ready: false, autoDeleteEnabled: false };
+const state: AppState = {
+  media: [], presentations: [], terminals: [], tickerMessages: [],
+  ready: false, autoDeleteEnabled: false, tickerSettings: { ...DEFAULT_TICKER },
+};
 const listeners = new Set<(s: AppState) => void>();
 let initStarted = false;
 let initPromise: Promise<void> | null = null;
 
 function emit() {
-  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages] };
+  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], tickerSettings: { ...state.tickerSettings } };
   listeners.forEach((l) => l(snap));
 }
 
@@ -145,7 +171,10 @@ async function init() {
     if (mRes.data) state.media = await Promise.all(mRes.data.map(mapMediaRow));
     if (pRes.data) state.presentations = pRes.data.map(mapPres);
     if (tRes.data) state.terminals = tRes.data.map(mapTerm);
-    if (sRes.data) state.autoDeleteEnabled = !!sRes.data.auto_delete_enabled;
+    if (sRes.data) {
+      state.autoDeleteEnabled = !!sRes.data.auto_delete_enabled;
+      state.tickerSettings = mapSettings(sRes.data);
+    }
     if (kRes.data) state.tickerMessages = kRes.data.map(mapTicker);
     state.ready = true;
     emit();
@@ -204,7 +233,10 @@ async function init() {
       .channel("ccp-settings")
       .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, (payload) => {
         const row: any = payload.new ?? payload.old;
-        if (row) state.autoDeleteEnabled = !!row.auto_delete_enabled;
+        if (row) {
+          state.autoDeleteEnabled = !!row.auto_delete_enabled;
+          state.tickerSettings = mapSettings(row);
+        }
         emit();
         runRetentionSweep();
       })
@@ -240,6 +272,28 @@ async function runRetentionSweep() {
 
 export async function setAutoDeleteEnabled(enabled: boolean) {
   await supabase.from("app_settings").update({ auto_delete_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", true);
+}
+
+function mapSettings(row: any): TickerSettings {
+  return {
+    heightPx: Number(row.ticker_height_px ?? DEFAULT_TICKER.heightPx),
+    fontFamily: row.ticker_font_family ?? DEFAULT_TICKER.fontFamily,
+    fontMin: Number(row.ticker_font_min ?? DEFAULT_TICKER.fontMin),
+    fontMax: Number(row.ticker_font_max ?? DEFAULT_TICKER.fontMax),
+    bgColor: row.ticker_bg_color ?? DEFAULT_TICKER.bgColor,
+    bgOpacity: Number(row.ticker_bg_opacity ?? DEFAULT_TICKER.bgOpacity),
+  };
+}
+
+export async function updateTickerSettings(patch: Partial<TickerSettings>) {
+  const db: any = { updated_at: new Date().toISOString() };
+  if (patch.heightPx !== undefined) db.ticker_height_px = Math.max(TICKER_HEIGHT_MIN, Math.min(TICKER_HEIGHT_MAX, Math.round(patch.heightPx)));
+  if (patch.fontFamily !== undefined) db.ticker_font_family = patch.fontFamily;
+  if (patch.fontMin !== undefined) db.ticker_font_min = patch.fontMin;
+  if (patch.fontMax !== undefined) db.ticker_font_max = patch.fontMax;
+  if (patch.bgColor !== undefined) db.ticker_bg_color = patch.bgColor;
+  if (patch.bgOpacity !== undefined) db.ticker_bg_opacity = patch.bgOpacity;
+  await supabase.from("app_settings").update(db).eq("id", true);
 }
 
 export async function deleteMediaBulk(ids: string[]) {

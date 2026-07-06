@@ -5,6 +5,9 @@ import { useStore, createPresentation, updatePresentation, deletePresentation, a
 import { dialog } from "@/components/PremiumDialog";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { showSuccess } from "@/components/SuccessNeon";
+import mockupImg from "@/assets/mockup-proporcao.jpg";
+import { useStore as useStoreForTicker } from "@/lib/store";
 
 export const Route = createFileRoute("/app/presentations")({ component: Pres });
 
@@ -85,14 +88,33 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
         description: draft.description,
         transition: draft.transition,
       });
-      toast.success("Apresentação salva e sincronizada");
+      showSuccess("Apresentação Salva Com Sucesso");
     } catch (e) {
       toast.error("Falha ao salvar");
     } finally { setSaving(false); }
   };
 
+  const [showGuide, setShowGuide] = useState(false);
+  const { tickerSettings } = useStoreForTicker();
+  // Approximate ticker share of a 1080-tall canvas for guide overlay.
+  const guideTickerPct = Math.round((tickerSettings.heightPx / 1080) * 100 * 10) / 10;
+
   return (
     <div className="space-y-5 ccp-anim-slide">
+      <div className="premium-border p-4 flex flex-col md:flex-row items-start md:items-center gap-4">
+        <img src={mockupImg} alt="Guia de proporção com e sem faixa" loading="lazy" width={1536} height={768} className="w-full md:w-[420px] rounded-lg object-contain bg-white" />
+        <div className="flex-1 text-sm space-y-2">
+          <p className="font-semibold">Guia de proporção 16:9</p>
+          <p className="text-muted-foreground">
+            Ao habilitar a faixa de notícias, a imagem/vídeo é reduzida proporcionalmente (letterbox) para caber acima da faixa. A faixa nunca sobrepõe o conteúdo. Altura máxima da faixa: <b>5&nbsp;cm (~189&nbsp;px)</b>.
+          </p>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={showGuide} onChange={(e) => setShowGuide(e.target.checked)} className="h-4 w-4 accent-primary" />
+            Mostrar guias de proporção nas prévias
+          </label>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {editingName ? (
           <div className="flex gap-2 items-center">
@@ -198,7 +220,17 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
 
       {preview && (
         <div onClick={() => setPreview(null)} className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-8 cursor-zoom-out">
-          {preview.type === "image" ? <img src={preview.url} className="max-h-full max-w-full object-contain" alt="" /> : <video src={preview.url} className="max-h-full max-w-full" controls autoPlay />}
+          <div className="relative max-h-full max-w-full">
+            {preview.type === "image"
+              ? <img src={preview.url} className="max-h-[85vh] max-w-full object-contain" alt="" />
+              : <video src={preview.url} className="max-h-[85vh] max-w-full" controls autoPlay />}
+            {showGuide && (
+              <div className="pointer-events-none absolute inset-0">
+                <div className="ccp-safearea-guide" />
+                <div className="ccp-safearea-guide-ticker" style={{ height: `${guideTickerPct}%` }} />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -18,16 +18,34 @@ export type Database = {
         Row: {
           auto_delete_enabled: boolean
           id: boolean
+          ticker_bg_color: string
+          ticker_bg_opacity: number
+          ticker_font_family: string
+          ticker_font_max: number
+          ticker_font_min: number
+          ticker_height_px: number
           updated_at: string
         }
         Insert: {
           auto_delete_enabled?: boolean
           id?: boolean
+          ticker_bg_color?: string
+          ticker_bg_opacity?: number
+          ticker_font_family?: string
+          ticker_font_max?: number
+          ticker_font_min?: number
+          ticker_height_px?: number
           updated_at?: string
         }
         Update: {
           auto_delete_enabled?: boolean
           id?: boolean
+          ticker_bg_color?: string
+          ticker_bg_opacity?: number
+          ticker_font_family?: string
+          ticker_font_max?: number
+          ticker_font_min?: number
+          ticker_height_px?: number
           updated_at?: string
         }
         Relationships: []
