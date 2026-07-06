@@ -36,8 +36,12 @@ function Prev() {
       {pres ? (
         <div className="flex justify-center ccp-anim-zoom">
           <div className={`relative premium-border-gradient bg-black shadow-2xl overflow-hidden ${orient === "h" ? "w-full max-w-4xl aspect-video" : "h-[70vh] aspect-[9/16]"}`}>
-            <PresentationPlayer presentationId={presId} />
-            <TickerBar />
+            <div className="absolute inset-0 flex flex-col">
+              <div className="relative flex-1 min-h-0">
+                <PresentationPlayer presentationId={presId} />
+              </div>
+              <TickerBar variant="inline" />
+            </div>
           </div>
         </div>
       ) : (

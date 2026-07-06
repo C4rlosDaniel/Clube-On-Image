@@ -12,7 +12,7 @@ export const Route = createFileRoute("/terminal/$id")({ component: TerminalScree
 function TerminalScreen() {
   const { id } = Route.useParams();
   const nav = useNavigate();
-  const { terminals } = useStore();
+  const { terminals, tickerSettings } = useStore();
   const terminal = terminals.find((t) => t.id === id);
   const [showUI, setShowUI] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -92,11 +92,17 @@ function TerminalScreen() {
   }
 
   return (
-    <div onClick={toggleFs} className="h-screen w-screen bg-black overflow-hidden cursor-pointer relative">
-      <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
-
-      {/* News ticker overlay - independent from player */}
-      <TickerBar terminalId={terminal.id} />
+    <div onClick={toggleFs} className="h-screen w-screen bg-black overflow-hidden cursor-pointer relative flex flex-col">
+      {/* Player fills the space above the ticker (letterbox, never cropped) */}
+      <div className="relative flex-1 min-h-0">
+        <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
+      </div>
+      {/* News ticker reserves its own row so it never overlaps the media */}
+      {terminal.showTicker && (
+        <div className="shrink-0" style={{ height: `${tickerSettings.heightPx}px` }}>
+          <TickerBar terminalId={terminal.id} variant="inline" />
+        </div>
+      )}
 
       {/* Marca d'água: somente o logo */}
       <div className="pointer-events-none absolute bottom-4 right-4 rounded-full bg-white/90 p-1 shadow-lg opacity-70">
