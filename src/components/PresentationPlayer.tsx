@@ -118,14 +118,16 @@ export function PresentationPlayer({ presentationId }: { presentationId: string 
             key={cur.id + ":" + idx}
             src={cur.url}
             alt=""
-            className={`absolute inset-0 h-full w-full object-contain ${animClass}`}
+            className={`absolute inset-0 ${animClass}`}
+            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
             onLoad={() => setReady(true)}
           />
         ) : (
           <video
             key={cur.id + ":" + idx}
             src={cur.url}
-            className={`absolute inset-0 h-full w-full object-contain ${animClass}`}
+            className={`absolute inset-0 ${animClass}`}
+            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
             autoPlay
             muted
             playsInline
