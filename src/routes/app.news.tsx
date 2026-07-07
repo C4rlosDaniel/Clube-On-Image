@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Trash2, Pencil, Check, X, AlertTriangle, ArrowUp, ArrowDown,
-  Power, Megaphone, Bold, Italic, Underline, Paintbrush, Loader2, Type, Settings2, Eye,
+  Power, Megaphone, Bold, Italic, Underline, Paintbrush, Loader2, Type, Settings2, Eye, Save, RotateCcw,
 } from "lucide-react";
 import {
   useStore,
@@ -13,6 +13,11 @@ import {
   updateTickerSettings,
   TICKER_HEIGHT_MIN,
   TICKER_HEIGHT_MAX,
+  TICKER_HEIGHT_MIN_CM,
+  TICKER_HEIGHT_MAX_CM,
+  TICKER_SPEED_MIN,
+  TICKER_SPEED_MAX,
+  PX_PER_CM,
   type TickerMessage,
   type TickerSettings,
 } from "@/lib/store";
@@ -20,7 +25,7 @@ import { dialog } from "@/components/PremiumDialog";
 import { TickerBar } from "@/components/TickerBar";
 import { toast } from "sonner";
 import { showSuccess } from "@/components/SuccessNeon";
-import mockupImg from "@/assets/mockup-proporcao.jpg";
+import { BlockingLoader } from "@/components/BlockingLoader";
 
 export const Route = createFileRoute("/app/news")({ component: NewsPage });
 
@@ -56,7 +61,7 @@ function NewsPage() {
   const { tickerMessages, terminals, tickerSettings } = useStore();
   const [editing, setEditing] = useState<TickerMessage | null>(null);
   const [creating, setCreating] = useState(false);
-  const [savingDelay, setSavingDelay] = useState(false);
+  const [processing, setProcessing] = useState<{ show: boolean; label: string }>({ show: false, label: "" });
 
   const sorted = useMemo(
     () =>
@@ -87,12 +92,11 @@ function NewsPage() {
     const plain = stripHtml(m.text).trim();
     if (!plain) { toast.error("Escreva o texto da mensagem"); return; }
     if (plain.length > MAX_CHARS) { toast.error(`Máximo de ${MAX_CHARS} caracteres`); return; }
-    setSavingDelay(true);
     const wasCreating = creating;
     const snapshotPrev = wasCreating ? null : tickerMessages.find((x) => x.id === m.id) ?? null;
-    // Close editor immediately; keep a subtle inline spinner via SuccessNeon later.
     setEditing(null); setCreating(false);
-    // 6s pre-processing delay
+    setProcessing({ show: true, label: "Salvando mensagem..." });
+    // 6s pre-processing delay (central blocking loader)
     await new Promise((r) => setTimeout(r, SAVE_DELAY_MS));
     try {
       let newId: string | null = null;
@@ -124,7 +128,7 @@ function NewsPage() {
       });
     } catch {
       toast.error("Falha ao salvar");
-    } finally { setSavingDelay(false); }
+    } finally { setProcessing({ show: false, label: "" }); }
   };
 
   const move = async (idx: number, dir: -1 | 1) => {
@@ -137,6 +141,8 @@ function NewsPage() {
 
   return (
     <div className="space-y-6">
+      <BlockingLoader show={processing.show} label={processing.label} sublabel="Aguarde alguns segundos, aplicando em todos os terminais." durationMs={SAVE_DELAY_MS} />
+
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Megaphone className="h-6 w-6 text-primary" /> Faixa de Notícias</h1>
@@ -144,40 +150,35 @@ function NewsPage() {
             Mensagens em rolagem exibidas no rodapé de todas as telas. Sincronização em tempo real.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {savingDelay && (
-            <span className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">
-              <Loader2 className="h-3 w-3 animate-spin" /> Processando...
-            </span>
-          )}
-          <button onClick={openNew} className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
-            <Plus className="h-4 w-4" /> Nova Mensagem
-          </button>
-        </div>
+        <button onClick={openNew} className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
+          <Plus className="h-4 w-4" /> Nova Mensagem
+        </button>
       </div>
 
-      {/* Proportion mockup + global settings */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-4">
-        <div className="premium-border p-4 space-y-3">
-          <p className="text-sm font-semibold flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Guia de proporção 16:9</p>
-          <img src={mockupImg} alt="Guia com e sem faixa" loading="lazy" width={1536} height={768} className="w-full rounded-lg object-contain bg-white" />
-          <p className="text-xs text-muted-foreground">
-            A faixa nunca sobrepõe a imagem. O conteúdo é reduzido proporcionalmente (letterbox) para caber acima da faixa. Altura máxima: <b>5&nbsp;cm (~189&nbsp;px)</b>.
-          </p>
-        </div>
-        <GlobalSettingsPanel settings={tickerSettings} />
-      </div>
+      {/* Global settings (with Save/Cancel + live ruler preview) */}
+      <GlobalSettingsPanel
+        settings={tickerSettings}
+        onProcessing={(label) => setProcessing({ show: true, label })}
+        onDone={() => setProcessing({ show: false, label: "" })}
+      />
 
-      {/* Live preview (16:9) with real content + live ticker */}
+      {/* Live preview: 16:9 canvas with the real ticker below the image */}
       <div className="premium-border p-3 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> Pré-visualização em tempo real</p>
         <div className="relative w-full mx-auto max-w-3xl aspect-video bg-black rounded-lg overflow-hidden flex flex-col">
           <div className="relative flex-1 min-h-0 bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center text-white/25 text-xs">
             (área da imagem/vídeo — letterbox)
           </div>
-          <TickerBar variant="inline" />
+          <TickerBar variant="inline" forceVisible />
         </div>
       </div>
+
+      {/* Global visibility toggles (Material-style) */}
+      <GlobalVisibilityPanel
+        settings={tickerSettings}
+        onProcessing={(label) => setProcessing({ show: true, label })}
+        onDone={() => setProcessing({ show: false, label: "" })}
+      />
 
       <div className="space-y-2">
         {sorted.length === 0 && (
@@ -249,79 +250,319 @@ function NewsPage() {
 }
 
 /* ============================================================
-   Global ticker settings panel (height / font family / bg color)
+   Global ticker settings panel (draft + Save/Cancel + ruler preview)
    ============================================================ */
-function GlobalSettingsPanel({ settings }: { settings: TickerSettings }) {
-  const [local, setLocal] = useState<TickerSettings>(settings);
-  useEffect(() => { setLocal(settings); }, [settings.heightPx, settings.fontFamily, settings.bgColor, settings.bgOpacity]);
-  const [saving, setSaving] = useState(false);
+type GlobalPanelProps = {
+  settings: TickerSettings;
+  onProcessing: (label: string) => void;
+  onDone: () => void;
+};
 
-  const commit = async (patch: Partial<TickerSettings>) => {
-    setLocal((s) => ({ ...s, ...patch }));
-    setSaving(true);
-    try { await updateTickerSettings(patch); } finally { setSaving(false); }
+function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProps) {
+  // draft = editable, un-saved state. Real preview only updates after Save.
+  const [draft, setDraft] = useState<TickerSettings>(settings);
+  const [cancelSpin, setCancelSpin] = useState(false);
+  // Sync when the real settings change (e.g. realtime update from another admin).
+  useEffect(() => { setDraft(settings); }, [settings.heightPx, settings.fontFamily, settings.bgColor, settings.bgOpacity, settings.scrollSpeed, settings.visibleAll, settings.fontMin, settings.fontMax]);
+
+  const dirty =
+    draft.heightPx !== settings.heightPx ||
+    draft.fontFamily !== settings.fontFamily ||
+    draft.bgColor !== settings.bgColor ||
+    draft.bgOpacity !== settings.bgOpacity ||
+    draft.scrollSpeed !== settings.scrollSpeed;
+
+  const heightCm = draft.heightPx / PX_PER_CM;
+
+  const setHeightCm = (cm: number) => {
+    const clamped = Math.max(TICKER_HEIGHT_MIN_CM, Math.min(TICKER_HEIGHT_MAX_CM, cm));
+    setDraft((s) => ({ ...s, heightPx: Math.round(clamped * PX_PER_CM) }));
+  };
+  const setSpeed = (v: number) => {
+    const clamped = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(v.toFixed(1))));
+    setDraft((s) => ({ ...s, scrollSpeed: clamped }));
+  };
+
+  const doSave = async () => {
+    onProcessing("Salvando configuração da faixa...");
+    await new Promise((r) => setTimeout(r, SAVE_DELAY_MS));
+    try {
+      await updateTickerSettings({
+        heightPx: draft.heightPx,
+        fontFamily: draft.fontFamily,
+        bgColor: draft.bgColor,
+        bgOpacity: draft.bgOpacity,
+        scrollSpeed: draft.scrollSpeed,
+      });
+      showSuccess("Configuração da Faixa Salva Com Sucesso");
+    } catch {
+      toast.error("Falha ao salvar configuração");
+    } finally {
+      onDone();
+    }
+  };
+
+  const doCancel = async () => {
+    setCancelSpin(true);
+    await new Promise((r) => setTimeout(r, 400));
+    setDraft(settings);
+    setCancelSpin(false);
+    toast.message("Alterações revertidas");
   };
 
   return (
     <div className="premium-border p-4 space-y-4">
-      <p className="text-sm font-semibold flex items-center gap-2">
-        <Settings2 className="h-4 w-4 text-primary" /> Configuração global da faixa
-        {saving && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        Estas configurações se aplicam a <b>todos os terminais</b> simultaneamente.
-      </p>
-
-      <div>
-        <label className="text-xs text-muted-foreground flex items-center justify-between">
-          <span>Altura da faixa</span>
-          <span className="font-mono text-foreground">{local.heightPx}px (~{(local.heightPx / 37.8).toFixed(2)}cm)</span>
-        </label>
-        <input
-          type="range" min={TICKER_HEIGHT_MIN} max={TICKER_HEIGHT_MAX} value={local.heightPx}
-          onChange={(e) => setLocal((s) => ({ ...s, heightPx: Number(e.target.value) }))}
-          onMouseUp={(e) => commit({ heightPx: Number((e.target as HTMLInputElement).value) })}
-          onTouchEnd={(e) => commit({ heightPx: Number((e.target as HTMLInputElement).value) })}
-          className="w-full accent-primary"
-        />
-        <p className="text-[10px] text-muted-foreground">Mín. {TICKER_HEIGHT_MIN}px · Máx. {TICKER_HEIGHT_MAX}px (5&nbsp;cm)</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-muted-foreground">Família de fonte</label>
-          <select
-            value={local.fontFamily}
-            onChange={(e) => commit({ fontFamily: e.target.value })}
-            className="w-full mt-1 rounded border bg-background px-2 py-2 text-sm"
-            style={{ fontFamily: local.fontFamily }}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-sm font-semibold flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-primary" /> Configuração global da faixa
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={doCancel}
+            disabled={!dirty || cancelSpin}
+            className="flex items-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-xs font-medium hover:bg-white/5 disabled:opacity-40"
           >
-            {FONT_FAMILIES.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
-          </select>
+            {cancelSpin ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+            Cancelar
+          </button>
+          <button
+            onClick={doSave}
+            disabled={!dirty}
+            className="flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold shadow-lg shadow-primary/30 disabled:opacity-40"
+          >
+            <Save className="h-3 w-3" /> Salvar
+          </button>
         </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Fundo da faixa</label>
-          <div className="mt-1 flex items-center gap-2">
-            <input type="color" value={local.bgColor} onChange={(e) => commit({ bgColor: e.target.value })} className="h-9 w-12 rounded border" />
-            <div className="flex-1">
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Estas configurações se aplicam a <b>todos os terminais</b> simultaneamente. Clique <b>Salvar</b> para aplicar (com processamento de {SAVE_DELAY_MS / 1000}s).
+      </p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5">
+        {/* Controls */}
+        <div className="space-y-4">
+          {/* Altura em cm */}
+          <div>
+            <label className="text-xs text-muted-foreground flex items-center justify-between">
+              <span>Altura da faixa</span>
+              <span className="font-mono text-foreground">{heightCm.toFixed(2)} cm ({draft.heightPx}px)</span>
+            </label>
+            <div className="flex items-center gap-2 mt-1">
               <input
-                type="range" min={0} max={1} step={0.05} value={local.bgOpacity}
-                onChange={(e) => setLocal((s) => ({ ...s, bgOpacity: Number(e.target.value) }))}
-                onMouseUp={(e) => commit({ bgOpacity: Number((e.target as HTMLInputElement).value) })}
-                onTouchEnd={(e) => commit({ bgOpacity: Number((e.target as HTMLInputElement).value) })}
-                className="w-full accent-primary"
+                type="range"
+                min={TICKER_HEIGHT_MIN_CM} max={TICKER_HEIGHT_MAX_CM} step={0.1}
+                value={heightCm}
+                onChange={(e) => setHeightCm(Number(e.target.value))}
+                className="flex-1 accent-primary"
               />
-              <p className="text-[10px] text-muted-foreground">Opacidade {Math.round(local.bgOpacity * 100)}%</p>
+              <input
+                type="number"
+                min={TICKER_HEIGHT_MIN_CM} max={TICKER_HEIGHT_MAX_CM} step={0.1}
+                value={Number(heightCm.toFixed(1))}
+                onChange={(e) => setHeightCm(Number(e.target.value))}
+                className="w-20 rounded border bg-background px-2 py-1 text-xs text-center"
+              />
+              <span className="text-[10px] text-muted-foreground">cm</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Mín. {TICKER_HEIGHT_MIN_CM.toFixed(1)}cm · Máx. {TICKER_HEIGHT_MAX_CM.toFixed(1)}cm</p>
+          </div>
+
+          {/* Velocidade de rolagem */}
+          <div>
+            <label className="text-xs text-muted-foreground flex items-center justify-between">
+              <span>Velocidade de rolagem</span>
+              <span className="font-mono text-foreground">{draft.scrollSpeed.toFixed(1)}×</span>
+            </label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="range"
+                min={TICKER_SPEED_MIN} max={TICKER_SPEED_MAX} step={0.1}
+                value={draft.scrollSpeed}
+                onChange={(e) => setSpeed(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <input
+                type="number"
+                min={TICKER_SPEED_MIN} max={TICKER_SPEED_MAX} step={0.1}
+                value={Number(draft.scrollSpeed.toFixed(1))}
+                onChange={(e) => setSpeed(Number(e.target.value))}
+                className="w-20 rounded border bg-background px-2 py-1 text-xs text-center"
+              />
+              <span className="text-[10px] text-muted-foreground">×</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · 2.0× = dobro da velocidade</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Família de fonte</label>
+              <select
+                value={draft.fontFamily}
+                onChange={(e) => setDraft((s) => ({ ...s, fontFamily: e.target.value }))}
+                className="w-full mt-1 rounded border bg-background px-2 py-2 text-sm"
+                style={{ fontFamily: draft.fontFamily }}
+              >
+                {FONT_FAMILIES.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Fundo da faixa</label>
+              <div className="mt-1 flex items-center gap-2">
+                <input type="color" value={draft.bgColor} onChange={(e) => setDraft((s) => ({ ...s, bgColor: e.target.value }))} className="h-9 w-12 rounded border" />
+                <div className="flex-1">
+                  <input
+                    type="range" min={0} max={1} step={0.05} value={draft.bgOpacity}
+                    onChange={(e) => setDraft((s) => ({ ...s, bgOpacity: Number(e.target.value) }))}
+                    className="w-full accent-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Opacidade {Math.round(draft.bgOpacity * 100)}%</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Live proportion ruler (updates instantly with slider/input) */}
+        <RulerPreview heightCm={heightCm} bg={draft.bgColor} bgOpacity={draft.bgOpacity} />
       </div>
     </div>
   );
 }
 
+function RulerPreview({ heightCm, bg, bgOpacity }: { heightCm: number; bg: string; bgOpacity: number }) {
+  // 1080p @ 96dpi ≈ 28.575 cm tall for a 1920x1080 canvas. We render a 16:9 canvas
+  // scaled to the container and label both image + ticker areas with cm rulers.
+  const CANVAS_CM = 1080 / PX_PER_CM;              // ≈ 28.575 cm
+  const tickerPct = (heightCm / CANVAS_CM) * 100;  // % of canvas height
+  const imgCm = CANVAS_CM - heightCm;
+  const rgba = hexToRgba(bg, bgOpacity);
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+      <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1">
+        <Eye className="h-3 w-3" /> Proporção real (1920×1080)
+      </p>
+      <div className="flex items-stretch gap-3">
+        {/* Canvas */}
+        <div className="flex-1 aspect-video bg-black rounded overflow-hidden flex flex-col relative">
+          <div className="flex-1 bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-white/40 text-[10px]">
+            imagem / vídeo
+          </div>
+          <div
+            className="w-full flex items-center justify-center text-[9px] font-semibold text-black/70"
+            style={{ height: `${tickerPct}%`, background: rgba }}
+          >
+            faixa
+          </div>
+        </div>
+        {/* Vertical ruler with cm labels */}
+        <div className="flex flex-col justify-between text-[10px] text-white/70 min-w-[70px]">
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-px w-3 bg-white/30" />
+            <span>imagem</span>
+          </div>
+          <div className="flex-1 flex items-center">
+            <div className="mr-2 h-full w-px bg-white/15" />
+            <span className="font-mono text-white/90">{imgCm.toFixed(1)} cm</span>
+          </div>
+          <div className="flex items-center gap-1 text-primary">
+            <span className="inline-block h-px w-3 bg-primary" />
+            <span>faixa</span>
+          </div>
+          <div className="flex items-center">
+            <div className="mr-2 h-4 w-px bg-primary" />
+            <span className="font-mono">{heightCm.toFixed(2)} cm</span>
+          </div>
+        </div>
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-2">
+        Régua atualiza em tempo real. A prévia real só muda após <b>Salvar</b>.
+      </p>
+    </div>
+  );
+}
+
+function hexToRgba(hex: string, opacity: number): string {
+  const c = hex.replace("#", "");
+  const short = c.length === 3;
+  const r = parseInt(short ? c[0] + c[0] : c.slice(0, 2), 16);
+  const g = parseInt(short ? c[1] + c[1] : c.slice(2, 4), 16);
+  const b = parseInt(short ? c[2] + c[2] : c.slice(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return hex;
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
 /* ============================================================
-   Rich message editor with 8 fonts, bold/italic/underline, color, format brush
+   Material-style global visibility toggles (mutually exclusive)
+   ============================================================ */
+function GlobalVisibilityPanel({ settings, onProcessing, onDone }: GlobalPanelProps) {
+  const apply = async (visibleAll: boolean) => {
+    if (visibleAll === settings.visibleAll) return;
+    const ok = await dialog.confirm({
+      title: visibleAll ? "Exibir faixa em todos os terminais?" : "Retirar faixa de todos os terminais?",
+      description: visibleAll
+        ? "A faixa de notícias voltará a aparecer em todas as TVs conectadas."
+        : "A faixa será removida imediatamente de todas as TVs. As mensagens continuam salvas.",
+      confirmLabel: "Confirmar",
+    });
+    if (!ok) return;
+    onProcessing(visibleAll ? "Ativando faixa em todos os terminais..." : "Removendo faixa de todos os terminais...");
+    await new Promise((r) => setTimeout(r, SAVE_DELAY_MS));
+    try {
+      await updateTickerSettings({ visibleAll });
+      showSuccess(visibleAll ? "Faixa Ativada em Todos os Terminais" : "Faixa Removida de Todos os Terminais");
+    } catch {
+      toast.error("Falha ao aplicar a mudança");
+    } finally {
+      onDone();
+    }
+  };
+
+  return (
+    <div className="premium-border p-4 space-y-3">
+      <p className="text-sm font-semibold">Exibição global da faixa</p>
+      <p className="text-xs text-muted-foreground">
+        Controle único que liga ou desliga a faixa em <b>todos os terminais simultaneamente</b>.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <MdSwitchRow
+          label="Exibir Faixa em Todos os Terminais"
+          on={settings.visibleAll}
+          onClick={() => apply(true)}
+        />
+        <MdSwitchRow
+          label="Retirar Faixa de Todos os Terminais"
+          on={!settings.visibleAll}
+          onClick={() => apply(false)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MdSwitchRow({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${on ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"}`}
+    >
+      <span className="text-sm font-medium">{label}</span>
+      <span
+        aria-checked={on}
+        role="switch"
+        className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${on ? "bg-primary" : "bg-white/15"}`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform ${on ? "translate-x-[22px]" : "translate-x-0.5"}`}
+          style={{ boxShadow: on ? "0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.15)" : "0 1px 3px rgba(0,0,0,0.35)" }}
+        />
+      </span>
+    </button>
+  );
+}
+
+/* ============================================================
+   Rich message editor — no font family / size (global-only now)
    ============================================================ */
 type MsgEditorProps = {
   message: TickerMessage;
@@ -335,10 +576,8 @@ type MsgEditorProps = {
 function MessageEditor({ message, creating, terminals, onChange, onCancel, onSave }: MsgEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [brushArmed, setBrushArmed] = useState(false);
-  const brushStyleRef = useRef<{ fontFamily?: string; fontSize?: string; color?: string; bold?: boolean; italic?: boolean; underline?: boolean } | null>(null);
-  const [saving, setSaving] = useState(false);
+  const brushStyleRef = useRef<{ color?: string; bold?: boolean; italic?: boolean; underline?: boolean } | null>(null);
 
-  // Set initial HTML
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== message.text) {
       editorRef.current.innerHTML = message.text || "";
@@ -350,7 +589,6 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
     let html = editorRef.current.innerHTML;
     const plain = stripHtml(html);
     if (plain.length > MAX_CHARS) {
-      // Trim to MAX_CHARS in plaintext: fall back to trimmed plain text.
       html = plain.slice(0, MAX_CHARS);
       editorRef.current.innerText = html;
     }
@@ -363,7 +601,6 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
     syncHtml();
   };
 
-  // Keyboard shortcuts: Ctrl+N bold, Ctrl+I italic, Ctrl+S underline (avoid save default)
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -385,8 +622,6 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
     if (!node) return;
     const cs = window.getComputedStyle(node);
     brushStyleRef.current = {
-      fontFamily: cs.fontFamily,
-      fontSize: cs.fontSize,
       color: cs.color,
       bold: cs.fontWeight === "bold" || parseInt(cs.fontWeight, 10) >= 600,
       italic: cs.fontStyle === "italic",
@@ -401,19 +636,7 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     const s = brushStyleRef.current;
-    if (s.fontFamily) exec("fontName", s.fontFamily.split(",")[0].replace(/['"]/g, "").trim());
     if (s.color) exec("foreColor", rgbToHex(s.color));
-    // execCommand fontSize accepts 1-7; we use CSS override via styleWithCSS.
-    document.execCommand("styleWithCSS", false, "true");
-    if (s.fontSize) exec("fontSize", "3");
-    // Wrap selection with a span carrying explicit font-size to bypass 1-7 mapping.
-    if (s.fontSize) {
-      const range = sel.getRangeAt(0);
-      const span = document.createElement("span");
-      span.style.fontSize = s.fontSize;
-      try { range.surroundContents(span); } catch { /* selection spans multiple nodes */ }
-      syncHtml();
-    }
     if (s.bold) exec("bold");
     if (s.italic) exec("italic");
     if (s.underline) exec("underline");
@@ -421,11 +644,6 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
   };
 
   const plainLen = stripHtml(message.text).length;
-
-  const handleSubmit = async () => {
-    setSaving(true);
-    onSave();
-  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={onCancel}>
@@ -440,38 +658,11 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
 
         <div>
           <label className="text-xs text-white/60">Texto da mensagem</label>
-          {/* Toolbar */}
+          <p className="text-[10px] text-white/40 mt-0.5">
+            Fonte e tamanho são definidos globalmente em <b>Configuração global da faixa</b>.
+          </p>
+          {/* Toolbar: only B / I / U / color / brush */}
           <div className="mt-1 flex flex-wrap items-center gap-1 rounded-t border border-white/10 bg-black/40 p-1.5">
-            <select
-              onChange={(e) => { if (e.target.value) exec("fontName", e.target.value); e.currentTarget.selectedIndex = 0; }}
-              className="rounded bg-white/5 border border-white/10 text-xs px-2 py-1"
-              defaultValue=""
-            >
-              <option value="" disabled>Fonte</option>
-              {FONT_FAMILIES.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
-            </select>
-            <select
-              onChange={(e) => {
-                if (!e.target.value) return;
-                document.execCommand("styleWithCSS", false, "true");
-                // wrap selection in span with explicit px size
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount && !sel.isCollapsed) {
-                  const range = sel.getRangeAt(0);
-                  const span = document.createElement("span");
-                  span.style.fontSize = `${e.target.value}px`;
-                  try { range.surroundContents(span); } catch { /* multi-node */ }
-                  syncHtml();
-                }
-                e.currentTarget.selectedIndex = 0;
-              }}
-              className="rounded bg-white/5 border border-white/10 text-xs px-2 py-1"
-              defaultValue=""
-            >
-              <option value="" disabled>Tam.</option>
-              {[12, 14, 16, 18, 20, 22, 24].map((s) => <option key={s} value={s}>{s}px</option>)}
-            </select>
-            <span className="mx-1 h-5 w-px bg-white/10" />
             <ToolBtn title="Negrito (Ctrl+N)" onClick={() => exec("bold")}><Bold className="h-3.5 w-3.5" /></ToolBtn>
             <ToolBtn title="Itálico (Ctrl+I)" onClick={() => exec("italic")}><Italic className="h-3.5 w-3.5" /></ToolBtn>
             <ToolBtn title="Sublinhado (Ctrl+S)" onClick={() => exec("underline")}><Underline className="h-3.5 w-3.5" /></ToolBtn>
@@ -498,7 +689,6 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
             onInput={syncHtml}
             onMouseUp={() => brushArmed && applyBrush()}
             className="min-h-[88px] rounded-b border-x border-b border-white/10 bg-black/40 px-3 py-2 text-sm outline-none prose-rte"
-            style={{ fontFamily: "Roboto" }}
           />
           {plainLen >= MAX_CHARS && (
             <p className="text-[11px] text-red-400 mt-1">Limite de {MAX_CHARS} caracteres atingido</p>
@@ -519,7 +709,7 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
             </datalist>
           </div>
           <div>
-            <label className="text-xs text-white/60">Cor da etiqueta</label>
+            <label className="text-xs text-white/60">Cor da etiqueta / fundo da caixa</label>
             <div className="mt-1 flex items-center gap-2">
               <input type="color" value={message.color} onChange={(e) => onChange({ ...message, color: e.target.value })} className="h-9 w-12 rounded border border-white/10 bg-black/40" />
               <div className="flex gap-1">
@@ -582,11 +772,10 @@ function MessageEditor({ message, creating, terminals, onChange, onCancel, onSav
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5">Cancelar</button>
           <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="rounded-lg px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:brightness-110 flex items-center gap-2 disabled:opacity-60"
+            onClick={onSave}
+            className="rounded-lg px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:brightness-110 flex items-center gap-2"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            <Check className="h-4 w-4" />
             {creating ? "Publicar" : "Salvar"}
           </button>
         </div>

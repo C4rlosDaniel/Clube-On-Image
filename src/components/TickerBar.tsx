@@ -14,13 +14,14 @@ type Props = {
    * - "inline": renders inline block that reserves vertical space so content isn't covered.
    */
   variant?: "overlay" | "inline";
+  /** Force render even if the global `visibleAll` toggle is off (used in admin previews). */
+  forceVisible?: boolean;
 };
 
-export function TickerBar({ terminalId, settingsOverride, messagesOverride, variant = "overlay" }: Props) {
-  const { tickerMessages, terminals, tickerSettings } = useStore();
-  const terminal = terminalId ? terminals.find((t) => t.id === terminalId) : null;
-  const enabled = terminal ? terminal.showTicker : true;
+export function TickerBar({ terminalId, settingsOverride, messagesOverride, variant = "overlay", forceVisible = false }: Props) {
+  const { tickerMessages, tickerSettings } = useStore();
   const settings: TickerSettings = { ...tickerSettings, ...(settingsOverride ?? {}) };
+  const enabled = forceVisible || settings.visibleAll;
 
   const active = useMemo(() => {
     const src = messagesOverride ?? tickerMessages;
@@ -42,13 +43,21 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
   // Strip html for speed estimation
   const stripHtml = (h: string) => h.replace(/<[^>]*>/g, "");
   const chain = active.map((m) => stripHtml(m.text)).join("     •     ");
-  const durationSec = Math.max(20, Math.round(chain.length / 6));
+  const speed = Math.max(0.1, Number(settings.scrollSpeed) || 1);
+  const baseSec = Math.max(20, Math.round(chain.length / 6));
+  const durationSec = baseSec / speed;
 
-  // Auto-sized font: clamp based on ticker height, respecting 0.2cm (~7.5px)
-  // padding on top/bottom, never exceeding the configured max (default 24).
-  const availableTextHeight = Math.max(12, settings.heightPx - 16);
-  const autoFont = Math.max(settings.fontMin, Math.min(settings.fontMax, Math.round(availableTextHeight * 0.42)));
-  const labelFont = Math.max(11, Math.min(settings.fontMax - 2, Math.round(autoFont * 0.85)));
+  // New font formula (cm-based bar, 1.0cm..2.2cm):
+  // Reserve 0.2cm (~7.56px) on top AND bottom of the text, always. Whatever's left
+  // is the max glyph height. Never exceed fontMax (24px) or dip below fontMin (12px).
+  const PADDING_PX = 7.56 * 2; // 0.2cm top + 0.2cm bottom
+  const availableTextHeight = Math.max(0, settings.heightPx - PADDING_PX);
+  // 0.85 accounts for ascender/descender so glyphs don't touch the padding.
+  const autoFont = Math.max(
+    settings.fontMin,
+    Math.min(settings.fontMax, Math.floor(availableTextHeight * 0.85)),
+  );
+  const labelFont = Math.max(11, Math.min(settings.fontMax - 2, Math.round(autoFont * 0.9)));
 
   const bg = hexWithOpacity(settings.bgColor, settings.bgOpacity);
 
