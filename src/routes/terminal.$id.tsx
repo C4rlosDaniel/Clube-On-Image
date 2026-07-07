@@ -98,7 +98,7 @@ function TerminalScreen() {
         <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
       </div>
       {/* News ticker reserves its own row so it never overlaps the media */}
-      {terminal.showTicker && (
+      {tickerSettings.visibleAll && (
         <div className="shrink-0" style={{ height: `${tickerSettings.heightPx}px` }}>
           <TickerBar terminalId={terminal.id} variant="inline" />
         </div>

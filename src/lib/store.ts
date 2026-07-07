@@ -9,6 +9,7 @@ export type Media = {
   url: string; // signed URL for display
   storagePath: string | null;
   createdAt: number;
+  sizeBytes: number;
 };
 
 export type Presentation = {
@@ -63,19 +64,37 @@ export type TickerSettings = {
   fontMax: number;
   bgColor: string;
   bgOpacity: number;
+  /** Horizontal scroll speed multiplier. 1.0 = baseline; 2.0 = twice as fast. */
+  scrollSpeed: number;
+  /** Global on/off switch for the ticker across every terminal. */
+  visibleAll: boolean;
 };
 
-export const TICKER_HEIGHT_MIN = 44;
-// 5cm at 96dpi ≈ 189px. This is the enforced maximum height for the ticker.
-export const TICKER_HEIGHT_MAX = 189;
+// 96 dpi conversion. Kept as a single source of truth.
+export const PX_PER_CM = 37.7952755906;
+// New spec: 1.0cm .. 2.2cm. Old 5cm limit is fully removed.
+export const TICKER_HEIGHT_MIN_CM = 1.0;
+export const TICKER_HEIGHT_MAX_CM = 2.2;
+export const TICKER_HEIGHT_MIN = Math.round(TICKER_HEIGHT_MIN_CM * PX_PER_CM); // ~38
+export const TICKER_HEIGHT_MAX = Math.round(TICKER_HEIGHT_MAX_CM * PX_PER_CM); // ~83
+
+// Scroll speed multiplier range for the ticker (1.0 = baseline).
+export const TICKER_SPEED_MIN = 1.0;
+export const TICKER_SPEED_MAX = 2.0;
+
+// Library storage cap (hard limit).
+export const MEDIA_LIMIT_BYTES = 500 * 1024 * 1024; // 500 MB
+export const MEDIA_WARN_BYTES = Math.round(MEDIA_LIMIT_BYTES * 0.9); // 450 MB
 
 const DEFAULT_TICKER: TickerSettings = {
-  heightPx: 96,
+  heightPx: Math.round(1.5 * PX_PER_CM), // ~57px (~1.5cm)
   fontFamily: "Roboto",
   fontMin: 12,
   fontMax: 24,
   bgColor: "#ffffff",
   bgOpacity: 0.95,
+  scrollSpeed: 1.0,
+  visibleAll: true,
 };
 
 const BUCKET = "media";
@@ -112,6 +131,7 @@ async function mapMediaRow(row: any): Promise<Media> {
     url,
     storagePath: row.storage_path ?? null,
     createdAt: new Date(row.created_at).getTime(),
+    sizeBytes: Number(row.size_bytes ?? 0),
   };
 }
 
@@ -275,13 +295,17 @@ export async function setAutoDeleteEnabled(enabled: boolean) {
 }
 
 function mapSettings(row: any): TickerSettings {
+  const rawHeight = Number(row.ticker_height_px ?? DEFAULT_TICKER.heightPx);
+  const heightPx = Math.max(TICKER_HEIGHT_MIN, Math.min(TICKER_HEIGHT_MAX, Math.round(rawHeight)));
   return {
-    heightPx: Number(row.ticker_height_px ?? DEFAULT_TICKER.heightPx),
+    heightPx,
     fontFamily: row.ticker_font_family ?? DEFAULT_TICKER.fontFamily,
     fontMin: Number(row.ticker_font_min ?? DEFAULT_TICKER.fontMin),
     fontMax: Number(row.ticker_font_max ?? DEFAULT_TICKER.fontMax),
     bgColor: row.ticker_bg_color ?? DEFAULT_TICKER.bgColor,
     bgOpacity: Number(row.ticker_bg_opacity ?? DEFAULT_TICKER.bgOpacity),
+    scrollSpeed: Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(row.ticker_scroll_speed ?? DEFAULT_TICKER.scrollSpeed))),
+    visibleAll: row.ticker_visible_all ?? DEFAULT_TICKER.visibleAll,
   };
 }
 
@@ -293,8 +317,21 @@ export async function updateTickerSettings(patch: Partial<TickerSettings>) {
   if (patch.fontMax !== undefined) db.ticker_font_max = patch.fontMax;
   if (patch.bgColor !== undefined) db.ticker_bg_color = patch.bgColor;
   if (patch.bgOpacity !== undefined) db.ticker_bg_opacity = patch.bgOpacity;
+  if (patch.scrollSpeed !== undefined) db.ticker_scroll_speed = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(patch.scrollSpeed)));
+  if (patch.visibleAll !== undefined) db.ticker_visible_all = !!patch.visibleAll;
   await supabase.from("app_settings").update(db).eq("id", true);
 }
+
+// ====== Library storage helpers ======
+export function getMediaTotalBytes(): number {
+  return state.media.reduce((acc, m) => acc + (m.sizeBytes || 0), 0);
+}
+export type AddMediaResult = {
+  added: Media[];
+  blocked: boolean;
+  reason?: "over-limit";
+  attemptedBytes: number;
+};
 
 export async function deleteMediaBulk(ids: string[]) {
   for (const id of ids) {
@@ -328,8 +365,14 @@ export function setSession(s: Session) {
 }
 
 // ====== Mutations ======
-export async function addMedia(files: FileList | File[]): Promise<Media[]> {
+export async function addMedia(files: FileList | File[]): Promise<AddMediaResult> {
   const arr = Array.from(files);
+  const attemptedBytes = arr.reduce((a, f) => a + f.size, 0);
+  const used = getMediaTotalBytes();
+  // Gate the entire batch: if it wouldn't fit, reject as a whole.
+  if (used + attemptedBytes > MEDIA_LIMIT_BYTES) {
+    return { added: [], blocked: true, reason: "over-limit", attemptedBytes };
+  }
   const out: Media[] = [];
   for (const file of arr) {
     const ext = file.name.split(".").pop() || "bin";
@@ -338,14 +381,13 @@ export async function addMedia(files: FileList | File[]): Promise<Media[]> {
     if (up.error) { console.error(up.error); continue; }
     const type: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
     const url = await signUrl(path);
-    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path }).select().single();
+    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path, size_bytes: file.size }).select().single();
     if (ins.error || !ins.data) { console.error(ins.error); continue; }
-    const media: Media = { id: ins.data.id, name: ins.data.name, type, url, storagePath: path, createdAt: Date.now() };
+    const media: Media = { id: ins.data.id, name: ins.data.name, type, url, storagePath: path, createdAt: Date.now(), sizeBytes: file.size };
     out.push(media);
-    // optimistic local update (realtime will reconcile)
     if (!state.media.find((m) => m.id === media.id)) { state.media.unshift(media); emit(); }
   }
-  return out;
+  return { added: out, blocked: false, attemptedBytes };
 }
 
 export async function deleteMediaFromLibrary(id: string) {

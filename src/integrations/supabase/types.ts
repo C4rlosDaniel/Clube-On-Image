@@ -24,6 +24,8 @@ export type Database = {
           ticker_font_max: number
           ticker_font_min: number
           ticker_height_px: number
+          ticker_scroll_speed: number
+          ticker_visible_all: boolean
           updated_at: string
         }
         Insert: {
@@ -35,6 +37,8 @@ export type Database = {
           ticker_font_max?: number
           ticker_font_min?: number
           ticker_height_px?: number
+          ticker_scroll_speed?: number
+          ticker_visible_all?: boolean
           updated_at?: string
         }
         Update: {
@@ -46,6 +50,8 @@ export type Database = {
           ticker_font_max?: number
           ticker_font_min?: number
           ticker_height_px?: number
+          ticker_scroll_speed?: number
+          ticker_visible_all?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -85,6 +91,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          size_bytes: number
           storage_path: string | null
           type: string
           url: string
@@ -93,6 +100,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          size_bytes?: number
           storage_path?: string | null
           type: string
           url: string
@@ -101,6 +109,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          size_bytes?: number
           storage_path?: string | null
           type?: string
           url?: string
