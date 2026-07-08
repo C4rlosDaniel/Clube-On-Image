@@ -169,8 +169,14 @@ function NewsPage() {
       <div className="premium-border p-3 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> Pré-visualização em tempo real</p>
         <div className="relative w-full mx-auto max-w-3xl aspect-video bg-black rounded-lg overflow-hidden flex flex-col">
-          <div className="relative flex-1 min-h-0 bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center text-white/25 text-xs">
-            (área da imagem/vídeo — letterbox)
+          <div className="relative flex-1 min-h-0 overflow-hidden">
+            <img
+              src={previewSample}
+              alt="Exemplo de conteúdo do terminal"
+              className="absolute inset-0 h-full w-full"
+              style={{ objectFit: "cover", objectPosition: "center" }}
+              loading="lazy"
+            />
           </div>
           <TickerBar variant="inline" forceVisible />
         </div>
