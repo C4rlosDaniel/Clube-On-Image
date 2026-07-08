@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Upload, Trash2, Eye, Pencil, Check, X, Search, CheckSquare, Square, Clock, HardDrive, AlertTriangle } from "lucide-react";
 import {
-  useStore, addMedia, deleteMediaFromLibrary, renameMedia, deleteMediaBulk, setAutoDeleteEnabled,
+  useStore, addMedia, renameMedia, deleteMediaBulk, setAutoDeleteEnabled,
   getMediaTotalBytes, MEDIA_LIMIT_BYTES, MEDIA_WARN_BYTES, type Media,
 } from "@/lib/store";
 import { dialog } from "@/components/PremiumDialog";
