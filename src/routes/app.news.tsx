@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Trash2, Pencil, Check, X, AlertTriangle, ArrowUp, ArrowDown,
-  Power, Megaphone, Bold, Italic, Underline, Paintbrush, Loader2, Type, Settings2, Eye, Save, RotateCcw,
+  Power, Megaphone, Bold, Italic, Underline, Paintbrush, Loader2, Type, Settings2, Eye, Save, RotateCcw, Zap,
 } from "lucide-react";
 import {
   useStore,
@@ -17,6 +17,8 @@ import {
   TICKER_HEIGHT_MAX_CM,
   TICKER_SPEED_MIN,
   TICKER_SPEED_MAX,
+  TICKER_FONT_MIN,
+  TICKER_FONT_MAX,
   PX_PER_CM,
   type TickerMessage,
   type TickerSettings,
@@ -26,6 +28,7 @@ import { TickerBar } from "@/components/TickerBar";
 import { toast } from "sonner";
 import { showSuccess } from "@/components/SuccessNeon";
 import { BlockingLoader } from "@/components/BlockingLoader";
+import previewSample from "@/assets/preview-sample.jpg";
 
 export const Route = createFileRoute("/app/news")({ component: NewsPage });
 
