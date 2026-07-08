@@ -279,7 +279,8 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
     draft.fontFamily !== settings.fontFamily ||
     draft.bgColor !== settings.bgColor ||
     draft.bgOpacity !== settings.bgOpacity ||
-    draft.scrollSpeed !== settings.scrollSpeed;
+    draft.scrollSpeed !== settings.scrollSpeed ||
+    draft.fontMax !== settings.fontMax;
 
   const heightCm = draft.heightPx / PX_PER_CM;
 
@@ -290,6 +291,10 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
   const setSpeed = (v: number) => {
     const clamped = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(v.toFixed(1))));
     setDraft((s) => ({ ...s, scrollSpeed: clamped }));
+  };
+  const setFontSize = (v: number) => {
+    const clamped = Math.max(TICKER_FONT_MIN, Math.min(TICKER_FONT_MAX, Math.round(v)));
+    setDraft((s) => ({ ...s, fontMax: clamped, fontMin: clamped }));
   };
 
   const doSave = async () => {
@@ -302,6 +307,8 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
         bgColor: draft.bgColor,
         bgOpacity: draft.bgOpacity,
         scrollSpeed: draft.scrollSpeed,
+        fontMin: draft.fontMax,
+        fontMax: draft.fontMax,
       });
       showSuccess("Configuração da Faixa Salva Com Sucesso");
     } catch {
