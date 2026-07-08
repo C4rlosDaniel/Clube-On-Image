@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Trash2, Pencil, Check, X, AlertTriangle, ArrowUp, ArrowDown,
-  Power, Megaphone, Bold, Italic, Underline, Paintbrush, Loader2, Type, Settings2, Eye, Save, RotateCcw,
+  Power, Megaphone, Bold, Italic, Underline, Paintbrush, Loader2, Type, Settings2, Eye, Save, RotateCcw, Zap,
 } from "lucide-react";
 import {
   useStore,
@@ -17,6 +17,8 @@ import {
   TICKER_HEIGHT_MAX_CM,
   TICKER_SPEED_MIN,
   TICKER_SPEED_MAX,
+  TICKER_FONT_MIN,
+  TICKER_FONT_MAX,
   PX_PER_CM,
   type TickerMessage,
   type TickerSettings,
@@ -26,6 +28,7 @@ import { TickerBar } from "@/components/TickerBar";
 import { toast } from "sonner";
 import { showSuccess } from "@/components/SuccessNeon";
 import { BlockingLoader } from "@/components/BlockingLoader";
+import previewSample from "@/assets/preview-sample.jpg";
 
 export const Route = createFileRoute("/app/news")({ component: NewsPage });
 
@@ -166,8 +169,14 @@ function NewsPage() {
       <div className="premium-border p-3 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> Pré-visualização em tempo real</p>
         <div className="relative w-full mx-auto max-w-3xl aspect-video bg-black rounded-lg overflow-hidden flex flex-col">
-          <div className="relative flex-1 min-h-0 bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center text-white/25 text-xs">
-            (área da imagem/vídeo — letterbox)
+          <div className="relative flex-1 min-h-0 overflow-hidden">
+            <img
+              src={previewSample}
+              alt="Exemplo de conteúdo do terminal"
+              className="absolute inset-0 h-full w-full"
+              style={{ objectFit: "cover", objectPosition: "center" }}
+              loading="lazy"
+            />
           </div>
           <TickerBar variant="inline" forceVisible />
         </div>
@@ -270,7 +279,8 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
     draft.fontFamily !== settings.fontFamily ||
     draft.bgColor !== settings.bgColor ||
     draft.bgOpacity !== settings.bgOpacity ||
-    draft.scrollSpeed !== settings.scrollSpeed;
+    draft.scrollSpeed !== settings.scrollSpeed ||
+    draft.fontMax !== settings.fontMax;
 
   const heightCm = draft.heightPx / PX_PER_CM;
 
@@ -281,6 +291,10 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
   const setSpeed = (v: number) => {
     const clamped = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(v.toFixed(1))));
     setDraft((s) => ({ ...s, scrollSpeed: clamped }));
+  };
+  const setFontSize = (v: number) => {
+    const clamped = Math.max(TICKER_FONT_MIN, Math.min(TICKER_FONT_MAX, Math.round(v)));
+    setDraft((s) => ({ ...s, fontMax: clamped, fontMin: clamped }));
   };
 
   const doSave = async () => {
@@ -293,6 +307,8 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
         bgColor: draft.bgColor,
         bgOpacity: draft.bgOpacity,
         scrollSpeed: draft.scrollSpeed,
+        fontMin: draft.fontMax,
+        fontMax: draft.fontMax,
       });
       showSuccess("Configuração da Faixa Salva Com Sucesso");
     } catch {
@@ -390,7 +406,27 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               />
               <span className="text-[10px] text-muted-foreground">×</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · 2.0× = dobro da velocidade</p>
+            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · até {TICKER_SPEED_MAX.toFixed(1)}× (quatro vezes mais rápido)</p>
+          </div>
+
+          {/* Tamanho do texto (manual, 12..24px) */}
+          <div>
+            <label className="text-xs text-muted-foreground flex items-center justify-between">
+              <span>Tamanho do texto</span>
+              <span className="font-mono text-foreground">{draft.fontMax}px</span>
+            </label>
+            <select
+              value={draft.fontMax}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="w-full mt-1 rounded border bg-background px-2 py-2 text-sm"
+            >
+              {Array.from({ length: TICKER_FONT_MAX - TICKER_FONT_MIN + 1 }, (_, i) => TICKER_FONT_MIN + i).map((s) => (
+                <option key={s} value={s}>{s}px</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Tamanho fixo, global. Se o texto ficar apertado, aumente a altura da faixa.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -430,53 +466,72 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
 }
 
 function RulerPreview({ heightCm, bg, bgOpacity }: { heightCm: number; bg: string; bgOpacity: number }) {
-  // 1080p @ 96dpi ≈ 28.575 cm tall for a 1920x1080 canvas. We render a 16:9 canvas
-  // scaled to the container and label both image + ticker areas with cm rulers.
+  // 1920x1080 canvas. cm are derived from actual pixels @ 96dpi.
   const CANVAS_CM = 1080 / PX_PER_CM;              // ≈ 28.575 cm
   const tickerPct = (heightCm / CANVAS_CM) * 100;  // % of canvas height
   const imgCm = CANVAS_CM - heightCm;
   const rgba = hexToRgba(bg, bgOpacity);
 
+  // Live pixel values (dynamic — update with the slider in real time).
+  const tickerPx = Math.round(heightCm * PX_PER_CM);
+  const imgPx = 1080 - tickerPx;
+
   return (
-    <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+    <div className="rounded-lg border border-white/10 bg-gradient-to-br from-black/60 to-zinc-900/60 p-3">
       <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1">
         <Eye className="h-3 w-3" /> Proporção real (1920×1080)
       </p>
       <div className="flex items-stretch gap-3">
         {/* Canvas */}
-        <div className="flex-1 aspect-video bg-black rounded overflow-hidden flex flex-col relative">
-          <div className="flex-1 bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-white/40 text-[10px]">
-            imagem / vídeo
+        <div className="flex-1 aspect-video bg-black rounded-md overflow-hidden flex flex-col relative shadow-inner">
+          <div className="ccp-prop-media flex-1 overflow-hidden">
+            <img
+              src={previewSample}
+              alt="Conteúdo de exemplo"
+              className="h-full w-full"
+              style={{ objectFit: "cover", objectPosition: "center" }}
+              loading="lazy"
+            />
           </div>
           <div
-            className="w-full flex items-center justify-center text-[9px] font-semibold text-black/70"
+            className="w-full flex items-center justify-center text-[9px] font-semibold text-black/70 border-t border-black/20"
             style={{ height: `${tickerPct}%`, background: rgba }}
           >
             faixa
           </div>
         </div>
-        {/* Vertical ruler with cm labels */}
-        <div className="flex flex-col justify-between text-[10px] text-white/70 min-w-[70px]">
-          <div className="flex items-center gap-1">
+        {/* Vertical ruler with cm labels — highlighted (bold + italic + accent color) */}
+        <div className="flex flex-col justify-between text-[10px] min-w-[92px]">
+          <div className="flex items-center gap-1 text-white/70">
             <span className="inline-block h-px w-3 bg-white/30" />
-            <span>imagem</span>
+            <span className="italic">imagem</span>
           </div>
           <div className="flex-1 flex items-center">
             <div className="mr-2 h-full w-px bg-white/15" />
-            <span className="font-mono text-white/90">{imgCm.toFixed(1)} cm</span>
+            <span className="font-mono italic font-bold text-emerald-300 drop-shadow-[0_0_6px_rgba(52,211,153,0.5)]">
+              {imgCm.toFixed(1)} cm
+            </span>
           </div>
           <div className="flex items-center gap-1 text-primary">
             <span className="inline-block h-px w-3 bg-primary" />
-            <span>faixa</span>
+            <span className="italic">faixa</span>
           </div>
           <div className="flex items-center">
             <div className="mr-2 h-4 w-px bg-primary" />
-            <span className="font-mono">{heightCm.toFixed(2)} cm</span>
+            <span className="font-mono italic font-bold text-primary drop-shadow-[0_0_6px_rgba(59,130,246,0.55)]">
+              {heightCm.toFixed(2)} cm
+            </span>
           </div>
         </div>
       </div>
-      <p className="text-[10px] text-muted-foreground mt-2">
-        Régua atualiza em tempo real. A prévia real só muda após <b>Salvar</b>.
+      <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-white/80 font-mono">
+        <Eye className="h-3.5 w-3.5 text-primary" />
+        <span>
+          Imagem <b className="italic text-emerald-300">1920×{imgPx}</b> · Faixa <b className="italic text-primary">1920×{tickerPx}</b>
+        </span>
+      </p>
+      <p className="text-[10px] text-muted-foreground mt-1 text-center">
+        Régua e pixels atualizam em tempo real. A prévia real só muda após <b>Salvar</b>.
       </p>
     </div>
   );
@@ -544,18 +599,18 @@ function MdSwitchRow({ label, on, onClick }: { label: string; on: boolean; onCli
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${on ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"}`}
+      className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${on ? "border-emerald-500/50 bg-emerald-500/5" : "border-red-500/40 bg-red-500/5 hover:bg-red-500/10"}`}
     >
       <span className="text-sm font-medium">{label}</span>
       <span
         aria-checked={on}
         role="switch"
-        className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${on ? "bg-primary" : "bg-white/15"}`}
+        data-on={on ? "true" : "false"}
+        className="ccp-md-switch"
       >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform ${on ? "translate-x-[22px]" : "translate-x-0.5"}`}
-          style={{ boxShadow: on ? "0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.15)" : "0 1px 3px rgba(0,0,0,0.35)" }}
-        />
+        <span className="ccp-md-thumb">
+          <Zap className="h-3 w-3" style={{ color: on ? "#16a34a" : "#dc2626" }} />
+        </span>
       </span>
     </button>
   );

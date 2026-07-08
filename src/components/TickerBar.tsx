@@ -47,17 +47,11 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
   const baseSec = Math.max(20, Math.round(chain.length / 6));
   const durationSec = baseSec / speed;
 
-  // New font formula (cm-based bar, 1.0cm..2.2cm):
-  // Reserve 0.2cm (~7.56px) on top AND bottom of the text, always. Whatever's left
-  // is the max glyph height. Never exceed fontMax (24px) or dip below fontMin (12px).
-  const PADDING_PX = 7.56 * 2; // 0.2cm top + 0.2cm bottom
-  const availableTextHeight = Math.max(0, settings.heightPx - PADDING_PX);
-  // 0.85 accounts for ascender/descender so glyphs don't touch the padding.
-  const autoFont = Math.max(
-    settings.fontMin,
-    Math.min(settings.fontMax, Math.floor(availableTextHeight * 0.85)),
-  );
-  const labelFont = Math.max(11, Math.min(settings.fontMax - 2, Math.round(autoFont * 0.9)));
+  // Manual font size (12..24px) chosen globally by the user. No auto formula.
+  // The user is responsible for increasing the bar height if the chosen size feels
+  // too tight — the system no longer enforces the old 0.2cm padding rule.
+  const autoFont = Math.max(12, Math.min(24, Math.round(settings.fontMax || 16)));
+  const labelFont = Math.max(11, Math.min(24, Math.round(autoFont * 0.95)));
 
   const bg = hexWithOpacity(settings.bgColor, settings.bgOpacity);
 
@@ -67,17 +61,17 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
 
   return (
     <div
-      className={`pointer-events-none ${positionClass} flex items-stretch`}
+      className={`pointer-events-none ${positionClass} flex items-stretch ccp-ticker-shell`}
       style={{ height: `${settings.heightPx}px`, fontFamily: settings.fontFamily }}
     >
       {/* Label */}
       <div
-        className="flex items-center gap-2 font-bold uppercase tracking-widest text-white shadow-lg"
+        className="ccp-ticker-label flex items-center gap-2 font-bold uppercase tracking-widest text-white"
         style={{
           background: primary.color,
           fontSize: `${labelFont}px`,
           letterSpacing: "0.18em",
-          padding: `0 max(16px, 0.2cm) 0 max(16px, 0.2cm)`,
+          padding: `0 18px`,
         }}
       >
         {primary.priority && <AlertTriangle className="h-4 w-4 animate-pulse" />}
@@ -85,8 +79,8 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
       </div>
       {/* Scrolling track */}
       <div
-        className="relative flex-1 overflow-hidden text-black backdrop-blur-sm border-t border-black/10"
-        style={{ background: bg, paddingTop: "0.2cm", paddingBottom: "0.2cm" }}
+        className="ccp-ticker-track-wrap relative flex-1 overflow-hidden text-black backdrop-blur-sm"
+        style={{ background: bg }}
       >
         <div
           className="ccp-ticker-track flex items-center h-full whitespace-nowrap font-medium will-change-transform"

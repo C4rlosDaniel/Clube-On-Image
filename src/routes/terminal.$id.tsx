@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LogOut, Pin, PinOff } from "lucide-react";
 import { useStore, setSession } from "@/lib/store";
 import { PresentationPlayer } from "@/components/PresentationPlayer";
@@ -12,10 +12,26 @@ export const Route = createFileRoute("/terminal/$id")({ component: TerminalScree
 function TerminalScreen() {
   const { id } = Route.useParams();
   const nav = useNavigate();
-  const { terminals, tickerSettings } = useStore();
+  const { terminals, tickerSettings, tickerMessages } = useStore();
   const terminal = terminals.find((t) => t.id === id);
   const [showUI, setShowUI] = useState(false);
   const [pinned, setPinned] = useState(false);
+
+  // Bloco B: the ticker row must only reserve vertical space when THIS terminal
+  // has at least one active message currently visible. Otherwise the media
+  // fills the whole screen (no black reserved strip).
+  const hasActiveTickerForThisTerminal = useMemo(() => {
+    if (!tickerSettings.visibleAll) return false; // kill-switch respected
+    const now = Date.now();
+    return tickerMessages.some((m) => {
+      if (!m.active) return false;
+      if (m.startsAt != null && m.startsAt > now) return false;
+      if (m.endsAt != null && m.endsAt < now) return false;
+      // Empty terminalIds = broadcast to all; otherwise must include THIS terminal.
+      if (m.terminalIds.length === 0) return true;
+      return terminal ? m.terminalIds.includes(terminal.id) : false;
+    });
+  }, [tickerMessages, tickerSettings.visibleAll, terminal?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -98,7 +114,7 @@ function TerminalScreen() {
         <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
       </div>
       {/* News ticker reserves its own row so it never overlaps the media */}
-      {tickerSettings.visibleAll && (
+      {hasActiveTickerForThisTerminal && (
         <div className="shrink-0" style={{ height: `${tickerSettings.heightPx}px` }}>
           <TickerBar terminalId={terminal.id} variant="inline" />
         </div>

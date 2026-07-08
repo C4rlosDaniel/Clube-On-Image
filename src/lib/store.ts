@@ -80,7 +80,11 @@ export const TICKER_HEIGHT_MAX = Math.round(TICKER_HEIGHT_MAX_CM * PX_PER_CM); /
 
 // Scroll speed multiplier range for the ticker (1.0 = baseline).
 export const TICKER_SPEED_MIN = 1.0;
-export const TICKER_SPEED_MAX = 2.0;
+export const TICKER_SPEED_MAX = 4.0;
+
+// Manual text-size range for the ticker (px).
+export const TICKER_FONT_MIN = 12;
+export const TICKER_FONT_MAX = 24;
 
 // Library storage cap (hard limit).
 export const MEDIA_LIMIT_BYTES = 500 * 1024 * 1024; // 500 MB
@@ -89,8 +93,8 @@ export const MEDIA_WARN_BYTES = Math.round(MEDIA_LIMIT_BYTES * 0.9); // 450 MB
 const DEFAULT_TICKER: TickerSettings = {
   heightPx: Math.round(1.5 * PX_PER_CM), // ~57px (~1.5cm)
   fontFamily: "Roboto",
-  fontMin: 12,
-  fontMax: 24,
+  fontMin: 16,
+  fontMax: 16,
   bgColor: "#ffffff",
   bgOpacity: 0.95,
   scrollSpeed: 1.0,
