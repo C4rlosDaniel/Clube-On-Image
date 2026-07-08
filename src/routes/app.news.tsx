@@ -599,18 +599,18 @@ function MdSwitchRow({ label, on, onClick }: { label: string; on: boolean; onCli
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${on ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"}`}
+      className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${on ? "border-emerald-500/50 bg-emerald-500/5" : "border-red-500/40 bg-red-500/5 hover:bg-red-500/10"}`}
     >
       <span className="text-sm font-medium">{label}</span>
       <span
         aria-checked={on}
         role="switch"
-        className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${on ? "bg-primary" : "bg-white/15"}`}
+        data-on={on ? "true" : "false"}
+        className="ccp-md-switch"
       >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform ${on ? "translate-x-[22px]" : "translate-x-0.5"}`}
-          style={{ boxShadow: on ? "0 2px 6px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.15)" : "0 1px 3px rgba(0,0,0,0.35)" }}
-        />
+        <span className="ccp-md-thumb">
+          <Zap className="h-3 w-3" style={{ color: on ? "#16a34a" : "#dc2626" }} />
+        </span>
       </span>
     </button>
   );
