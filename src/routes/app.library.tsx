@@ -7,6 +7,7 @@ import {
 } from "@/lib/store";
 import { dialog } from "@/components/PremiumDialog";
 import { toast } from "sonner";
+import { showSuccess } from "@/components/SuccessNeon";
 import { BlockingLoader } from "@/components/BlockingLoader";
 
 export const Route = createFileRoute("/app/library")({ component: Lib });
@@ -60,7 +61,7 @@ function Lib() {
     try {
       await deleteMediaBulk(ids);
       clearAll();
-      toast.success(`${ids.length} item(ns) excluído(s)`);
+      showSuccess(`${ids.length} Mídia(s) Excluída(s)`);
     } finally {
       setProcessing({ show: false, label: "" });
     }
@@ -81,7 +82,7 @@ function Lib() {
       if (result.blocked) {
         toast.error("Armazenamento da Biblioteca Cheio, Remova uma Imagem/Vídeo Para Fazer um Upload");
       } else if (result.added.length) {
-        toast.success(`${result.added.length} mídia(s) enviada(s)`);
+        showSuccess(`${result.added.length} Mídia(s) Enviada(s)`);
       }
     } finally {
       setProcessing({ show: false, label: "" });
@@ -203,9 +204,6 @@ function Lib() {
                 )}
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase text-muted-foreground">{m.type}</span>
-                <button onClick={async () => { if (await dialog.confirm({ title: "Excluir mídia?", description: "Ela será removida de todas as apresentações vinculadas.", confirmLabel: "Excluir", destructive: true })) { await deleteMediaFromLibrary(m.id); toast.success("Mídia excluída"); } }} className="text-destructive hover:opacity-80">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
             </div>
