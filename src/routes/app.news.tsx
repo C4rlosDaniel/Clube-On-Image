@@ -406,7 +406,27 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               />
               <span className="text-[10px] text-muted-foreground">×</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · 2.0× = dobro da velocidade</p>
+            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · até {TICKER_SPEED_MAX.toFixed(1)}× (quatro vezes mais rápido)</p>
+          </div>
+
+          {/* Tamanho do texto (manual, 12..24px) */}
+          <div>
+            <label className="text-xs text-muted-foreground flex items-center justify-between">
+              <span>Tamanho do texto</span>
+              <span className="font-mono text-foreground">{draft.fontMax}px</span>
+            </label>
+            <select
+              value={draft.fontMax}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="w-full mt-1 rounded border bg-background px-2 py-2 text-sm"
+            >
+              {Array.from({ length: TICKER_FONT_MAX - TICKER_FONT_MIN + 1 }, (_, i) => TICKER_FONT_MIN + i).map((s) => (
+                <option key={s} value={s}>{s}px</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Tamanho fixo, global. Se o texto ficar apertado, aumente a altura da faixa.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
