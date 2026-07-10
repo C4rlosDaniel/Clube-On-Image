@@ -37,8 +37,9 @@ function preloadMedia(m: Media | undefined): Promise<void> {
 }
 
 export function PresentationPlayer({ presentationId }: { presentationId: string | null }) {
-  const { presentations, media } = useStore();
+  const { presentations, media, tickerSettings } = useStore();
   const pres = presentations.find((p) => p.id === presentationId);
+  const fit: "contain" | "cover" = tickerSettings.letterboxMode ? "contain" : "cover";
 
   const items = useMemo(
     () => ((pres?.mediaIds ?? [])
@@ -119,7 +120,7 @@ export function PresentationPlayer({ presentationId }: { presentationId: string 
             src={cur.url}
             alt=""
             className={`absolute inset-0 ${animClass}`}
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+            style={{ width: "100%", height: "100%", objectFit: fit, objectPosition: "center", display: "block" }}
             onLoad={() => setReady(true)}
           />
         ) : (
@@ -127,7 +128,7 @@ export function PresentationPlayer({ presentationId }: { presentationId: string 
             key={cur.id + ":" + idx}
             src={cur.url}
             className={`absolute inset-0 ${animClass}`}
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+            style={{ width: "100%", height: "100%", objectFit: fit, objectPosition: "center", display: "block" }}
             autoPlay
             muted
             playsInline

@@ -33,6 +33,8 @@ function TerminalScreen() {
     });
   }, [tickerMessages, tickerSettings.visibleAll, terminal?.id]);
 
+  const letterbox = tickerSettings.letterboxMode;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     setPinned(localStorage.getItem("ccp_default_terminal") === id);
@@ -113,11 +115,14 @@ function TerminalScreen() {
       <div className="relative flex-1 min-h-0">
         <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
       </div>
-      {/* News ticker reserves its own row so it never overlaps the media */}
-      {hasActiveTickerForThisTerminal && (
+      {/* Ticker reserves its own row only in letterbox mode; otherwise it overlays the media. */}
+      {hasActiveTickerForThisTerminal && letterbox && (
         <div className="shrink-0" style={{ height: `${tickerSettings.heightPx}px` }}>
           <TickerBar terminalId={terminal.id} variant="inline" />
         </div>
+      )}
+      {hasActiveTickerForThisTerminal && !letterbox && (
+        <TickerBar terminalId={terminal.id} variant="overlay" />
       )}
 
       {/* Marca d'água: somente o logo */}

@@ -68,6 +68,13 @@ export type TickerSettings = {
   scrollSpeed: number;
   /** Global on/off switch for the ticker across every terminal. */
   visibleAll: boolean;
+  /**
+   * When true (default), media respects its original proportion (object-fit: contain)
+   * and the ticker reserves its own vertical strip so it never overlaps the media.
+   * When false, media fills the whole screen (object-fit: cover) and the ticker
+   * is rendered as an overlay on top of it.
+   */
+  letterboxMode: boolean;
 };
 
 // 96 dpi conversion. Kept as a single source of truth.
@@ -80,7 +87,7 @@ export const TICKER_HEIGHT_MAX = Math.round(TICKER_HEIGHT_MAX_CM * PX_PER_CM); /
 
 // Scroll speed multiplier range for the ticker (1.0 = baseline).
 export const TICKER_SPEED_MIN = 1.0;
-export const TICKER_SPEED_MAX = 4.0;
+export const TICKER_SPEED_MAX = 8.0;
 
 // Manual text-size range for the ticker (px).
 export const TICKER_FONT_MIN = 12;
@@ -99,6 +106,7 @@ const DEFAULT_TICKER: TickerSettings = {
   bgOpacity: 0.95,
   scrollSpeed: 1.0,
   visibleAll: true,
+  letterboxMode: true,
 };
 
 const BUCKET = "media";
@@ -310,6 +318,7 @@ function mapSettings(row: any): TickerSettings {
     bgOpacity: Number(row.ticker_bg_opacity ?? DEFAULT_TICKER.bgOpacity),
     scrollSpeed: Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(row.ticker_scroll_speed ?? DEFAULT_TICKER.scrollSpeed))),
     visibleAll: row.ticker_visible_all ?? DEFAULT_TICKER.visibleAll,
+    letterboxMode: row.ticker_letterbox_mode ?? DEFAULT_TICKER.letterboxMode,
   };
 }
 
@@ -323,6 +332,7 @@ export async function updateTickerSettings(patch: Partial<TickerSettings>) {
   if (patch.bgOpacity !== undefined) db.ticker_bg_opacity = patch.bgOpacity;
   if (patch.scrollSpeed !== undefined) db.ticker_scroll_speed = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(patch.scrollSpeed)));
   if (patch.visibleAll !== undefined) db.ticker_visible_all = !!patch.visibleAll;
+  if (patch.letterboxMode !== undefined) db.ticker_letterbox_mode = !!patch.letterboxMode;
   await supabase.from("app_settings").update(db).eq("id", true);
 }
 

@@ -167,18 +167,19 @@ function NewsPage() {
 
       {/* Live preview: 16:9 canvas with the real ticker below the image */}
       <div className="premium-border p-3 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> Pré-visualização em tempo real</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> PreView</p>
         <div className="relative w-full mx-auto max-w-3xl aspect-video bg-black rounded-lg overflow-hidden flex flex-col">
           <div className="relative flex-1 min-h-0 overflow-hidden">
             <img
               src={previewSample}
               alt="Exemplo de conteúdo do terminal"
               className="absolute inset-0 h-full w-full"
-              style={{ objectFit: "cover", objectPosition: "center" }}
+              style={{ objectFit: tickerSettings.letterboxMode ? "contain" : "cover", objectPosition: "center", background: "#000" }}
               loading="lazy"
             />
+            {!tickerSettings.letterboxMode && <TickerBar variant="overlay" forceVisible />}
           </div>
-          <TickerBar variant="inline" forceVisible />
+          {tickerSettings.letterboxMode && <TickerBar variant="inline" forceVisible />}
         </div>
       </div>
 
@@ -272,7 +273,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
   const [draft, setDraft] = useState<TickerSettings>(settings);
   const [cancelSpin, setCancelSpin] = useState(false);
   // Sync when the real settings change (e.g. realtime update from another admin).
-  useEffect(() => { setDraft(settings); }, [settings.heightPx, settings.fontFamily, settings.bgColor, settings.bgOpacity, settings.scrollSpeed, settings.visibleAll, settings.fontMin, settings.fontMax]);
+  useEffect(() => { setDraft(settings); }, [settings.heightPx, settings.fontFamily, settings.bgColor, settings.bgOpacity, settings.scrollSpeed, settings.visibleAll, settings.fontMin, settings.fontMax, settings.letterboxMode]);
 
   const dirty =
     draft.heightPx !== settings.heightPx ||
@@ -280,7 +281,8 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
     draft.bgColor !== settings.bgColor ||
     draft.bgOpacity !== settings.bgOpacity ||
     draft.scrollSpeed !== settings.scrollSpeed ||
-    draft.fontMax !== settings.fontMax;
+    draft.fontMax !== settings.fontMax ||
+    draft.letterboxMode !== settings.letterboxMode;
 
   const heightCm = draft.heightPx / PX_PER_CM;
 
@@ -309,6 +311,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
         scrollSpeed: draft.scrollSpeed,
         fontMin: draft.fontMax,
         fontMax: draft.fontMax,
+        letterboxMode: draft.letterboxMode,
       });
       showSuccess("Configuração da Faixa Salva Com Sucesso");
     } catch {
@@ -351,7 +354,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Estas configurações se aplicam a <b>todos os terminais</b> simultaneamente. Clique <b>Salvar</b> para aplicar (com processamento de {SAVE_DELAY_MS / 1000}s).
+        Estas configurações se aplicam a todos os terminais simultaneamente. Clique em salvar para aplicar as alterações
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5">
@@ -406,7 +409,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               />
               <span className="text-[10px] text-muted-foreground">×</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · até {TICKER_SPEED_MAX.toFixed(1)}× (quatro vezes mais rápido)</p>
+            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · até {TICKER_SPEED_MAX.toFixed(1)}× (oito vezes mais rápido)</p>
           </div>
 
           {/* Tamanho do texto (manual, 12..24px) */}
@@ -456,6 +459,31 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               </div>
             </div>
           </div>
+
+          {/* Letterbox toggle — global. When on: media respects proportion and ticker
+              reserves its own strip. When off: media fills the screen and the ticker
+              overlays on top of it (may overlap). */}
+          <button
+            type="button"
+            onClick={() => setDraft((s) => ({ ...s, letterboxMode: !s.letterboxMode }))}
+            className={`w-full flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${draft.letterboxMode ? "border-emerald-500/50 bg-emerald-500/5" : "border-red-500/40 bg-red-500/5 hover:bg-red-500/10"}`}
+          >
+            <span className="min-w-0">
+              <span className="text-sm font-medium block">
+                Letterbox {draft.letterboxMode ? "ativado" : "desativado"}
+              </span>
+              <span className="text-[10px] text-muted-foreground block mt-0.5">
+                {draft.letterboxMode
+                  ? "Mantém proporção da mídia; a faixa reserva espaço e nunca sobrepõe o conteúdo."
+                  : "Mídia preenche a tela na proporção original enviada; a faixa passa a sobrepor o conteúdo."}
+              </span>
+            </span>
+            <span aria-checked={draft.letterboxMode} role="switch" data-on={draft.letterboxMode ? "true" : "false"} className="ccp-md-switch shrink-0">
+              <span className="ccp-md-thumb">
+                <Zap className="h-3 w-3" style={{ color: draft.letterboxMode ? "#16a34a" : "#dc2626" }} />
+              </span>
+            </span>
+          </button>
         </div>
 
         {/* Live proportion ruler (updates instantly with slider/input) */}
@@ -478,8 +506,8 @@ function RulerPreview({ heightCm, bg, bgOpacity }: { heightCm: number; bg: strin
 
   return (
     <div className="rounded-lg border border-white/10 bg-gradient-to-br from-black/60 to-zinc-900/60 p-3">
-      <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1">
-        <Eye className="h-3 w-3" /> Proporção real (1920×1080)
+      <p className="text-[11px] uppercase tracking-widest text-white font-bold italic mb-2 flex items-center gap-1">
+        <Eye className="h-3 w-3 text-amber-300" /> Proporção real (1920×1080)
       </p>
       <div className="flex items-stretch gap-3">
         {/* Canvas */}
@@ -494,44 +522,44 @@ function RulerPreview({ heightCm, bg, bgOpacity }: { heightCm: number; bg: strin
             />
           </div>
           <div
-            className="w-full flex items-center justify-center text-[9px] font-semibold text-black/70 border-t border-black/20"
+            className="w-full flex items-center justify-center text-[10px] font-bold italic text-black/80 border-t border-black/20"
             style={{ height: `${tickerPct}%`, background: rgba }}
           >
-            faixa
+            Faixa
           </div>
         </div>
         {/* Vertical ruler with cm labels — highlighted (bold + italic + accent color) */}
-        <div className="flex flex-col justify-between text-[10px] min-w-[92px]">
-          <div className="flex items-center gap-1 text-white/70">
-            <span className="inline-block h-px w-3 bg-white/30" />
-            <span className="italic">imagem</span>
+        <div className="flex flex-col justify-between text-[13px] min-w-[110px]">
+          <div className="flex items-center gap-1.5 text-white">
+            <span className="inline-block h-px w-3 bg-white/50" />
+            <span className="italic font-bold text-white text-[14px]">Imagem</span>
           </div>
           <div className="flex-1 flex items-center">
             <div className="mr-2 h-full w-px bg-white/15" />
-            <span className="font-mono italic font-bold text-emerald-300 drop-shadow-[0_0_6px_rgba(52,211,153,0.5)]">
+            <span className="font-mono italic font-bold text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.55)] text-[14px]">
               {imgCm.toFixed(1)} cm
             </span>
           </div>
-          <div className="flex items-center gap-1 text-primary">
-            <span className="inline-block h-px w-3 bg-primary" />
-            <span className="italic">faixa</span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-px w-3 bg-white/50" />
+            <span className="italic font-bold text-white text-[14px]">Faixa</span>
           </div>
           <div className="flex items-center">
-            <div className="mr-2 h-4 w-px bg-primary" />
-            <span className="font-mono italic font-bold text-primary drop-shadow-[0_0_6px_rgba(59,130,246,0.55)]">
+            <div className="mr-2 h-4 w-px bg-amber-300" />
+            <span className="font-mono italic font-bold text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.55)] text-[14px]">
               {heightCm.toFixed(2)} cm
             </span>
           </div>
         </div>
       </div>
-      <p className="mt-3 flex items-center justify-center gap-2 text-[11px] text-white/80 font-mono">
-        <Eye className="h-3.5 w-3.5 text-primary" />
+      <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-white font-bold italic">
+        <Eye className="h-3.5 w-3.5 text-amber-300" />
         <span>
-          Imagem <b className="italic text-emerald-300">1920×{imgPx}</b> · Faixa <b className="italic text-primary">1920×{tickerPx}</b>
+          Imagem <b className="italic font-mono text-amber-300">1920×{imgPx}</b> · Faixa <b className="italic font-mono text-amber-300">1920×{tickerPx}</b>
         </span>
       </p>
-      <p className="text-[10px] text-muted-foreground mt-1 text-center">
-        Régua e pixels atualizam em tempo real. A prévia real só muda após <b>Salvar</b>.
+      <p className="text-[10px] text-white/70 italic mt-1 text-center">
+        Régua e pixels atualizam em tempo real. A prévia real só muda após <b className="text-white">Salvar</b>.
       </p>
     </div>
   );
