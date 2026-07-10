@@ -352,7 +352,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Estas configurações se aplicam a <b>todos os terminais</b> simultaneamente. Clique <b>Salvar</b> para aplicar (com processamento de {SAVE_DELAY_MS / 1000}s).
+        Estas configurações se aplicam a todos os terminais simultaneamente. Clique em salvar para aplicar as alterações
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5">
