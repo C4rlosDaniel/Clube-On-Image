@@ -9,16 +9,17 @@ export const Route = createFileRoute("/app/preview")({ component: Prev });
 
 function Prev() {
   const store = useStore();
-  const { presentations, terminals, media } = store;
+  const { presentations, terminals, media, tickerSettings } = store;
   const [presId, setPresId] = useState<string>(presentations[0]?.id ?? "");
   const [orient, setOrient] = useState<"h" | "v">("h");
   const pres = presentations.find((p) => p.id === presId);
+  const letterbox = tickerSettings.letterboxMode;
 
   return (
     <div className="space-y-5">
       <div className="flex justify-between flex-wrap gap-3 items-end">
         <div>
-          <h1 className="text-2xl font-bold">Preview em Tempo Real</h1>
+          <h1 className="text-2xl font-bold">PreView</h1>
           <p className="text-sm text-muted-foreground">Simulação de TV horizontal e vertical. Atualiza instantaneamente.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -39,8 +40,9 @@ function Prev() {
             <div className="absolute inset-0 flex flex-col">
               <div className="relative flex-1 min-h-0">
                 <PresentationPlayer presentationId={presId} />
+                {!letterbox && <TickerBar variant="overlay" />}
               </div>
-              <TickerBar variant="inline" />
+              {letterbox && <TickerBar variant="inline" />}
             </div>
           </div>
         </div>
