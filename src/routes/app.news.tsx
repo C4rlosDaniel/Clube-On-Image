@@ -459,6 +459,31 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               </div>
             </div>
           </div>
+
+          {/* Letterbox toggle — global. When on: media respects proportion and ticker
+              reserves its own strip. When off: media fills the screen and the ticker
+              overlays on top of it (may overlap). */}
+          <button
+            type="button"
+            onClick={() => setDraft((s) => ({ ...s, letterboxMode: !s.letterboxMode }))}
+            className={`w-full flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${draft.letterboxMode ? "border-emerald-500/50 bg-emerald-500/5" : "border-red-500/40 bg-red-500/5 hover:bg-red-500/10"}`}
+          >
+            <span className="min-w-0">
+              <span className="text-sm font-medium block">
+                Letterbox {draft.letterboxMode ? "ativado" : "desativado"}
+              </span>
+              <span className="text-[10px] text-muted-foreground block mt-0.5">
+                {draft.letterboxMode
+                  ? "Mantém proporção da mídia; a faixa reserva espaço e nunca sobrepõe o conteúdo."
+                  : "Mídia preenche a tela na proporção original enviada; a faixa passa a sobrepor o conteúdo."}
+              </span>
+            </span>
+            <span aria-checked={draft.letterboxMode} role="switch" data-on={draft.letterboxMode ? "true" : "false"} className="ccp-md-switch shrink-0">
+              <span className="ccp-md-thumb">
+                <Zap className="h-3 w-3" style={{ color: draft.letterboxMode ? "#16a34a" : "#dc2626" }} />
+              </span>
+            </span>
+          </button>
         </div>
 
         {/* Live proportion ruler (updates instantly with slider/input) */}
