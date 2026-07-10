@@ -167,18 +167,19 @@ function NewsPage() {
 
       {/* Live preview: 16:9 canvas with the real ticker below the image */}
       <div className="premium-border p-3 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> Pré-visualização em tempo real</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Eye className="h-3 w-3" /> PreView</p>
         <div className="relative w-full mx-auto max-w-3xl aspect-video bg-black rounded-lg overflow-hidden flex flex-col">
           <div className="relative flex-1 min-h-0 overflow-hidden">
             <img
               src={previewSample}
               alt="Exemplo de conteúdo do terminal"
               className="absolute inset-0 h-full w-full"
-              style={{ objectFit: "cover", objectPosition: "center" }}
+              style={{ objectFit: tickerSettings.letterboxMode ? "contain" : "cover", objectPosition: "center", background: "#000" }}
               loading="lazy"
             />
+            {!tickerSettings.letterboxMode && <TickerBar variant="overlay" forceVisible />}
           </div>
-          <TickerBar variant="inline" forceVisible />
+          {tickerSettings.letterboxMode && <TickerBar variant="inline" forceVisible />}
         </div>
       </div>
 
