@@ -409,7 +409,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               />
               <span className="text-[10px] text-muted-foreground">×</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · até {TICKER_SPEED_MAX.toFixed(1)}× (quatro vezes mais rápido)</p>
+            <p className="text-[10px] text-muted-foreground mt-1">1.0× = padrão · até {TICKER_SPEED_MAX.toFixed(1)}× (oito vezes mais rápido)</p>
           </div>
 
           {/* Tamanho do texto (manual, 12..24px) */}
