@@ -72,6 +72,8 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
           fontSize: `${labelFont}px`,
           letterSpacing: "0.18em",
           padding: `0 18px`,
+          border: "2px solid rgba(255,255,255,0.95)",
+          borderRadius: 8,
         }}
       >
         {primary.priority && <AlertTriangle className="h-4 w-4 animate-pulse" />}
@@ -80,7 +82,7 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
       {/* Scrolling track */}
       <div
         className="ccp-ticker-track-wrap relative flex-1 overflow-hidden text-black backdrop-blur-sm"
-        style={{ background: bg }}
+        style={{ background: bg, border: "2px solid #dc2626", borderRadius: 8 }}
       >
         <div
           className="ccp-ticker-track flex items-center h-full whitespace-nowrap font-medium will-change-transform"
