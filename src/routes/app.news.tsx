@@ -273,7 +273,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
   const [draft, setDraft] = useState<TickerSettings>(settings);
   const [cancelSpin, setCancelSpin] = useState(false);
   // Sync when the real settings change (e.g. realtime update from another admin).
-  useEffect(() => { setDraft(settings); }, [settings.heightPx, settings.fontFamily, settings.bgColor, settings.bgOpacity, settings.scrollSpeed, settings.visibleAll, settings.fontMin, settings.fontMax]);
+  useEffect(() => { setDraft(settings); }, [settings.heightPx, settings.fontFamily, settings.bgColor, settings.bgOpacity, settings.scrollSpeed, settings.visibleAll, settings.fontMin, settings.fontMax, settings.letterboxMode]);
 
   const dirty =
     draft.heightPx !== settings.heightPx ||
@@ -281,7 +281,8 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
     draft.bgColor !== settings.bgColor ||
     draft.bgOpacity !== settings.bgOpacity ||
     draft.scrollSpeed !== settings.scrollSpeed ||
-    draft.fontMax !== settings.fontMax;
+    draft.fontMax !== settings.fontMax ||
+    draft.letterboxMode !== settings.letterboxMode;
 
   const heightCm = draft.heightPx / PX_PER_CM;
 
@@ -310,6 +311,7 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
         scrollSpeed: draft.scrollSpeed,
         fontMin: draft.fontMax,
         fontMax: draft.fontMax,
+        letterboxMode: draft.letterboxMode,
       });
       showSuccess("Configuração da Faixa Salva Com Sucesso");
     } catch {
