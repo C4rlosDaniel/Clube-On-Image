@@ -318,6 +318,7 @@ function mapSettings(row: any): TickerSettings {
     bgOpacity: Number(row.ticker_bg_opacity ?? DEFAULT_TICKER.bgOpacity),
     scrollSpeed: Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(row.ticker_scroll_speed ?? DEFAULT_TICKER.scrollSpeed))),
     visibleAll: row.ticker_visible_all ?? DEFAULT_TICKER.visibleAll,
+    letterboxMode: row.ticker_letterbox_mode ?? DEFAULT_TICKER.letterboxMode,
   };
 }
 
@@ -331,6 +332,7 @@ export async function updateTickerSettings(patch: Partial<TickerSettings>) {
   if (patch.bgOpacity !== undefined) db.ticker_bg_opacity = patch.bgOpacity;
   if (patch.scrollSpeed !== undefined) db.ticker_scroll_speed = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(patch.scrollSpeed)));
   if (patch.visibleAll !== undefined) db.ticker_visible_all = !!patch.visibleAll;
+  if (patch.letterboxMode !== undefined) db.ticker_letterbox_mode = !!patch.letterboxMode;
   await supabase.from("app_settings").update(db).eq("id", true);
 }
 
