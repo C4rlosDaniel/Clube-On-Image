@@ -1,9 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { LogOut, Pin, PinOff } from "lucide-react";
 import { useStore, setSession } from "@/lib/store";
 import { PresentationPlayer } from "@/components/PresentationPlayer";
-import { TickerBar } from "@/components/TickerBar";
 import logo from "@/assets/logo.png";
 import { toast } from "sonner";
 
@@ -12,28 +11,10 @@ export const Route = createFileRoute("/terminal/$id")({ component: TerminalScree
 function TerminalScreen() {
   const { id } = Route.useParams();
   const nav = useNavigate();
-  const { terminals, tickerSettings, tickerMessages } = useStore();
+  const { terminals } = useStore();
   const terminal = terminals.find((t) => t.id === id);
   const [showUI, setShowUI] = useState(false);
   const [pinned, setPinned] = useState(false);
-
-  // Bloco B: the ticker row must only reserve vertical space when THIS terminal
-  // has at least one active message currently visible. Otherwise the media
-  // fills the whole screen (no black reserved strip).
-  const hasActiveTickerForThisTerminal = useMemo(() => {
-    if (!tickerSettings.visibleAll) return false; // kill-switch respected
-    const now = Date.now();
-    return tickerMessages.some((m) => {
-      if (!m.active) return false;
-      if (m.startsAt != null && m.startsAt > now) return false;
-      if (m.endsAt != null && m.endsAt < now) return false;
-      // Empty terminalIds = broadcast to all; otherwise must include THIS terminal.
-      if (m.terminalIds.length === 0) return true;
-      return terminal ? m.terminalIds.includes(terminal.id) : false;
-    });
-  }, [tickerMessages, tickerSettings.visibleAll, terminal?.id]);
-
-  const letterbox = tickerSettings.letterboxMode;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -110,20 +91,8 @@ function TerminalScreen() {
   }
 
   return (
-    <div onClick={toggleFs} className="h-screen w-screen bg-black overflow-hidden cursor-pointer relative flex flex-col">
-      {/* Player fills the space above the ticker (letterbox, never cropped) */}
-      <div className="relative flex-1 min-h-0">
-        <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
-      </div>
-      {/* Ticker reserves its own row only in letterbox mode; otherwise it overlays the media. */}
-      {hasActiveTickerForThisTerminal && letterbox && (
-        <div className="shrink-0" style={{ height: `${tickerSettings.heightPx}px` }}>
-          <TickerBar terminalId={terminal.id} variant="inline" />
-        </div>
-      )}
-      {hasActiveTickerForThisTerminal && !letterbox && (
-        <TickerBar terminalId={terminal.id} variant="overlay" />
-      )}
+    <div onClick={toggleFs} className="h-screen w-screen bg-black overflow-hidden cursor-pointer relative">
+      <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
 
       {/* Marca d'água: somente o logo */}
       <div className="pointer-events-none absolute bottom-4 right-4 rounded-full bg-white/90 p-1 shadow-lg opacity-70">

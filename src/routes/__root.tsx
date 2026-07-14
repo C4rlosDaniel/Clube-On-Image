@@ -11,7 +11,6 @@ import {
 import appCss from "../styles.css?url";
 import { DialogHost } from "@/components/PremiumDialog";
 import { Toaster } from "@/components/ui/sonner";
-import { SuccessNeonHost } from "@/components/SuccessNeon";
 
 function NotFoundComponent() {
   return (
@@ -124,7 +123,6 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <DialogHost />
-      <SuccessNeonHost />
       <Toaster theme="dark" position="top-right" richColors />
     </QueryClientProvider>
   );

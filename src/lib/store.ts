@@ -9,7 +9,6 @@ export type Media = {
   url: string; // signed URL for display
   storagePath: string | null;
   createdAt: number;
-  sizeBytes: number;
 };
 
 export type Presentation = {
@@ -30,98 +29,26 @@ export type Terminal = {
   resolution: string;
   refreshToken: number;
   lastSync: number;
-  showTicker: boolean;
-};
-
-export type TickerMessage = {
-  id: string;
-  text: string;
-  label: string;
-  color: string;
-  priority: boolean;
-  active: boolean;
-  orderIndex: number;
-  startsAt: number | null;
-  endsAt: number | null;
-  terminalIds: string[]; // empty = all
-  createdAt: number;
 };
 
 export type AppState = {
   media: Media[];
   presentations: Presentation[];
   terminals: Terminal[];
-  tickerMessages: TickerMessage[];
   ready: boolean;
   autoDeleteEnabled: boolean;
-  tickerSettings: TickerSettings;
-};
-
-export type TickerSettings = {
-  heightPx: number;
-  fontFamily: string;
-  fontMin: number;
-  fontMax: number;
-  bgColor: string;
-  bgOpacity: number;
-  /** Horizontal scroll speed multiplier. 1.0 = baseline; 2.0 = twice as fast. */
-  scrollSpeed: number;
-  /** Global on/off switch for the ticker across every terminal. */
-  visibleAll: boolean;
-  /**
-   * When true (default), media respects its original proportion (object-fit: contain)
-   * and the ticker reserves its own vertical strip so it never overlaps the media.
-   * When false, media fills the whole screen (object-fit: cover) and the ticker
-   * is rendered as an overlay on top of it.
-   */
-  letterboxMode: boolean;
-};
-
-// 96 dpi conversion. Kept as a single source of truth.
-export const PX_PER_CM = 37.7952755906;
-// New spec: 1.0cm .. 2.2cm. Old 5cm limit is fully removed.
-export const TICKER_HEIGHT_MIN_CM = 1.0;
-export const TICKER_HEIGHT_MAX_CM = 2.2;
-export const TICKER_HEIGHT_MIN = Math.round(TICKER_HEIGHT_MIN_CM * PX_PER_CM); // ~38
-export const TICKER_HEIGHT_MAX = Math.round(TICKER_HEIGHT_MAX_CM * PX_PER_CM); // ~83
-
-// Scroll speed multiplier range for the ticker (1.0 = baseline).
-export const TICKER_SPEED_MIN = 1.0;
-export const TICKER_SPEED_MAX = 8.0;
-
-// Manual text-size range for the ticker (px).
-export const TICKER_FONT_MIN = 12;
-export const TICKER_FONT_MAX = 24;
-
-// Library storage cap (hard limit).
-export const MEDIA_LIMIT_BYTES = 500 * 1024 * 1024; // 500 MB
-export const MEDIA_WARN_BYTES = Math.round(MEDIA_LIMIT_BYTES * 0.9); // 450 MB
-
-const DEFAULT_TICKER: TickerSettings = {
-  heightPx: Math.round(1.5 * PX_PER_CM), // ~57px (~1.5cm)
-  fontFamily: "Roboto",
-  fontMin: 16,
-  fontMax: 16,
-  bgColor: "#ffffff",
-  bgOpacity: 0.95,
-  scrollSpeed: 1.0,
-  visibleAll: true,
-  letterboxMode: true,
 };
 
 const BUCKET = "media";
 const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
-const state: AppState = {
-  media: [], presentations: [], terminals: [], tickerMessages: [],
-  ready: false, autoDeleteEnabled: false, tickerSettings: { ...DEFAULT_TICKER },
-};
+const state: AppState = { media: [], presentations: [], terminals: [], ready: false, autoDeleteEnabled: false };
 const listeners = new Set<(s: AppState) => void>();
 let initStarted = false;
 let initPromise: Promise<void> | null = null;
 
 function emit() {
-  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], tickerSettings: { ...state.tickerSettings } };
+  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals] };
   listeners.forEach((l) => l(snap));
 }
 
@@ -143,7 +70,6 @@ async function mapMediaRow(row: any): Promise<Media> {
     url,
     storagePath: row.storage_path ?? null,
     createdAt: new Date(row.created_at).getTime(),
-    sizeBytes: Number(row.size_bytes ?? 0),
   };
 }
 
@@ -168,23 +94,6 @@ function mapTerm(row: any): Terminal {
     resolution: row.resolution,
     refreshToken: Number(row.refresh_token ?? 0),
     lastSync: new Date(row.last_sync).getTime(),
-    showTicker: row.show_ticker ?? true,
-  };
-}
-
-function mapTicker(row: any): TickerMessage {
-  return {
-    id: row.id,
-    text: row.text,
-    label: row.label ?? "AVISO",
-    color: row.color ?? "#dc2626",
-    priority: !!row.priority,
-    active: !!row.active,
-    orderIndex: row.order_index ?? 0,
-    startsAt: row.starts_at ? new Date(row.starts_at).getTime() : null,
-    endsAt: row.ends_at ? new Date(row.ends_at).getTime() : null,
-    terminalIds: row.terminal_ids ?? [],
-    createdAt: new Date(row.created_at).getTime(),
   };
 }
 
@@ -193,21 +102,16 @@ async function init() {
   if (initStarted) return initPromise!;
   initStarted = true;
   initPromise = (async () => {
-    const [mRes, pRes, tRes, sRes, kRes] = await Promise.all([
+    const [mRes, pRes, tRes, sRes] = await Promise.all([
       supabase.from("media").select("*").order("created_at", { ascending: false }),
       supabase.from("presentations").select("*").order("created_at", { ascending: false }),
       supabase.from("terminals").select("*").order("created_at", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", true).maybeSingle(),
-      supabase.from("ticker_messages").select("*").order("order_index", { ascending: true }),
     ]);
     if (mRes.data) state.media = await Promise.all(mRes.data.map(mapMediaRow));
     if (pRes.data) state.presentations = pRes.data.map(mapPres);
     if (tRes.data) state.terminals = tRes.data.map(mapTerm);
-    if (sRes.data) {
-      state.autoDeleteEnabled = !!sRes.data.auto_delete_enabled;
-      state.tickerSettings = mapSettings(sRes.data);
-    }
-    if (kRes.data) state.tickerMessages = kRes.data.map(mapTicker);
+    if (sRes.data) state.autoDeleteEnabled = !!sRes.data.auto_delete_enabled;
     state.ready = true;
     emit();
 
@@ -265,28 +169,9 @@ async function init() {
       .channel("ccp-settings")
       .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, (payload) => {
         const row: any = payload.new ?? payload.old;
-        if (row) {
-          state.autoDeleteEnabled = !!row.auto_delete_enabled;
-          state.tickerSettings = mapSettings(row);
-        }
+        if (row) state.autoDeleteEnabled = !!row.auto_delete_enabled;
         emit();
         runRetentionSweep();
-      })
-      .subscribe();
-
-    supabase
-      .channel("ccp-ticker")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_messages" }, (payload) => {
-        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-          const m = mapTicker(payload.new);
-          const idx = state.tickerMessages.findIndex((x) => x.id === m.id);
-          if (idx >= 0) state.tickerMessages[idx] = m;
-          else state.tickerMessages.push(m);
-          state.tickerMessages.sort((a, b) => a.orderIndex - b.orderIndex);
-        } else if (payload.eventType === "DELETE") {
-          state.tickerMessages = state.tickerMessages.filter((x) => x.id !== (payload.old as any).id);
-        }
-        emit();
       })
       .subscribe();
   })();
@@ -306,47 +191,6 @@ export async function setAutoDeleteEnabled(enabled: boolean) {
   await supabase.from("app_settings").update({ auto_delete_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", true);
 }
 
-function mapSettings(row: any): TickerSettings {
-  const rawHeight = Number(row.ticker_height_px ?? DEFAULT_TICKER.heightPx);
-  const heightPx = Math.max(TICKER_HEIGHT_MIN, Math.min(TICKER_HEIGHT_MAX, Math.round(rawHeight)));
-  return {
-    heightPx,
-    fontFamily: row.ticker_font_family ?? DEFAULT_TICKER.fontFamily,
-    fontMin: Number(row.ticker_font_min ?? DEFAULT_TICKER.fontMin),
-    fontMax: Number(row.ticker_font_max ?? DEFAULT_TICKER.fontMax),
-    bgColor: row.ticker_bg_color ?? DEFAULT_TICKER.bgColor,
-    bgOpacity: Number(row.ticker_bg_opacity ?? DEFAULT_TICKER.bgOpacity),
-    scrollSpeed: Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(row.ticker_scroll_speed ?? DEFAULT_TICKER.scrollSpeed))),
-    visibleAll: row.ticker_visible_all ?? DEFAULT_TICKER.visibleAll,
-    letterboxMode: row.ticker_letterbox_mode ?? DEFAULT_TICKER.letterboxMode,
-  };
-}
-
-export async function updateTickerSettings(patch: Partial<TickerSettings>) {
-  const db: any = { updated_at: new Date().toISOString() };
-  if (patch.heightPx !== undefined) db.ticker_height_px = Math.max(TICKER_HEIGHT_MIN, Math.min(TICKER_HEIGHT_MAX, Math.round(patch.heightPx)));
-  if (patch.fontFamily !== undefined) db.ticker_font_family = patch.fontFamily;
-  if (patch.fontMin !== undefined) db.ticker_font_min = patch.fontMin;
-  if (patch.fontMax !== undefined) db.ticker_font_max = patch.fontMax;
-  if (patch.bgColor !== undefined) db.ticker_bg_color = patch.bgColor;
-  if (patch.bgOpacity !== undefined) db.ticker_bg_opacity = patch.bgOpacity;
-  if (patch.scrollSpeed !== undefined) db.ticker_scroll_speed = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(patch.scrollSpeed)));
-  if (patch.visibleAll !== undefined) db.ticker_visible_all = !!patch.visibleAll;
-  if (patch.letterboxMode !== undefined) db.ticker_letterbox_mode = !!patch.letterboxMode;
-  await supabase.from("app_settings").update(db).eq("id", true);
-}
-
-// ====== Library storage helpers ======
-export function getMediaTotalBytes(): number {
-  return state.media.reduce((acc, m) => acc + (m.sizeBytes || 0), 0);
-}
-export type AddMediaResult = {
-  added: Media[];
-  blocked: boolean;
-  reason?: "over-limit";
-  attemptedBytes: number;
-};
-
 export async function deleteMediaBulk(ids: string[]) {
   for (const id of ids) {
     try { await deleteMediaFromLibrary(id); } catch (e) { console.error(e); }
@@ -354,7 +198,7 @@ export async function deleteMediaBulk(ids: string[]) {
 }
 
 export function useStore(): AppState {
-  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages] }));
+  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals] }));
   useEffect(() => {
     const l = (n: AppState) => setS(n);
     listeners.add(l);
@@ -379,14 +223,8 @@ export function setSession(s: Session) {
 }
 
 // ====== Mutations ======
-export async function addMedia(files: FileList | File[]): Promise<AddMediaResult> {
+export async function addMedia(files: FileList | File[]): Promise<Media[]> {
   const arr = Array.from(files);
-  const attemptedBytes = arr.reduce((a, f) => a + f.size, 0);
-  const used = getMediaTotalBytes();
-  // Gate the entire batch: if it wouldn't fit, reject as a whole.
-  if (used + attemptedBytes > MEDIA_LIMIT_BYTES) {
-    return { added: [], blocked: true, reason: "over-limit", attemptedBytes };
-  }
   const out: Media[] = [];
   for (const file of arr) {
     const ext = file.name.split(".").pop() || "bin";
@@ -395,13 +233,14 @@ export async function addMedia(files: FileList | File[]): Promise<AddMediaResult
     if (up.error) { console.error(up.error); continue; }
     const type: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
     const url = await signUrl(path);
-    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path, size_bytes: file.size }).select().single();
+    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path }).select().single();
     if (ins.error || !ins.data) { console.error(ins.error); continue; }
-    const media: Media = { id: ins.data.id, name: ins.data.name, type, url, storagePath: path, createdAt: Date.now(), sizeBytes: file.size };
+    const media: Media = { id: ins.data.id, name: ins.data.name, type, url, storagePath: path, createdAt: Date.now() };
     out.push(media);
+    // optimistic local update (realtime will reconcile)
     if (!state.media.find((m) => m.id === media.id)) { state.media.unshift(media); emit(); }
   }
-  return { added: out, blocked: false, attemptedBytes };
+  return out;
 }
 
 export async function deleteMediaFromLibrary(id: string) {
@@ -450,7 +289,6 @@ export async function updateTerminal(id: string, patch: Partial<Terminal>) {
   if (patch.presentationId !== undefined) dbPatch.presentation_id = patch.presentationId;
   if (patch.active !== undefined) dbPatch.active = patch.active;
   if (patch.resolution !== undefined) dbPatch.resolution = patch.resolution;
-  if (patch.showTicker !== undefined) dbPatch.show_ticker = patch.showTicker;
   await supabase.from("terminals").update(dbPatch).eq("id", id);
 }
 
@@ -463,45 +301,4 @@ export async function pingTerminal(terminalId: string) {
   const t = state.terminals.find((x) => x.id === terminalId);
   const next = (t?.refreshToken ?? 0) + 1;
   await supabase.from("terminals").update({ refresh_token: next, last_sync: new Date().toISOString() }).eq("id", terminalId);
-}
-
-// ====== Ticker messages ======
-export async function createTickerMessage(patch: Partial<TickerMessage> & { text: string }) {
-  const orderIndex = (state.tickerMessages.reduce((m, x) => Math.max(m, x.orderIndex), 0) ?? 0) + 1;
-  const row: any = {
-    text: patch.text,
-    label: patch.label ?? "AVISO",
-    color: patch.color ?? "#dc2626",
-    priority: patch.priority ?? false,
-    active: patch.active ?? true,
-    order_index: patch.orderIndex ?? orderIndex,
-    starts_at: patch.startsAt ? new Date(patch.startsAt).toISOString() : null,
-    ends_at: patch.endsAt ? new Date(patch.endsAt).toISOString() : null,
-    terminal_ids: patch.terminalIds ?? [],
-  };
-  const ins = await supabase.from("ticker_messages").insert(row).select().single();
-  if (ins.error) console.error(ins.error);
-  return ins.data?.id ?? null;
-}
-
-export async function updateTickerMessage(id: string, patch: Partial<TickerMessage>) {
-  const db: any = {};
-  if (patch.text !== undefined) db.text = patch.text;
-  if (patch.label !== undefined) db.label = patch.label;
-  if (patch.color !== undefined) db.color = patch.color;
-  if (patch.priority !== undefined) db.priority = patch.priority;
-  if (patch.active !== undefined) db.active = patch.active;
-  if (patch.orderIndex !== undefined) db.order_index = patch.orderIndex;
-  if (patch.startsAt !== undefined) db.starts_at = patch.startsAt ? new Date(patch.startsAt).toISOString() : null;
-  if (patch.endsAt !== undefined) db.ends_at = patch.endsAt ? new Date(patch.endsAt).toISOString() : null;
-  if (patch.terminalIds !== undefined) db.terminal_ids = patch.terminalIds;
-  await supabase.from("ticker_messages").update(db).eq("id", id);
-}
-
-export async function deleteTickerMessage(id: string) {
-  await supabase.from("ticker_messages").delete().eq("id", id);
-}
-
-export async function reorderTickerMessages(orderedIds: string[]) {
-  await Promise.all(orderedIds.map((id, i) => updateTickerMessage(id, { orderIndex: i })));
 }

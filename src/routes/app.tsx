@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { LogOut, Eye, Layers, Monitor, Library, Megaphone } from "lucide-react";
+import { LogOut, Eye, Layers, Monitor, Library } from "lucide-react";
 import { getSession, setSession } from "@/lib/store";
 import logo from "@/assets/logo.png";
 
@@ -13,7 +13,6 @@ const tabs = [
   { to: "/app/presentations", label: "Apresentações", icon: Layers },
   { to: "/app/terminals", label: "Atribuições", icon: Monitor },
   { to: "/app/library", label: "Biblioteca", icon: Library },
-  { to: "/app/news", label: "Faixa de Notícias", icon: Megaphone },
 ] as const;
 
 function AppLayout() {

@@ -156,7 +156,7 @@ function Index() {
         </div>
       </div>
       <div className="hidden md:block relative">
-        <LoginBackground src={loginBg} />
+        <img src={loginBg} alt="Clube Pirassununga" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-l from-transparent via-black/40 to-[#0b0b0d]" />
         <div className="absolute bottom-8 left-8 right-8 text-right">
           <p className="text-xs uppercase tracking-widest text-white/60">Clube Pirassununga · 1928</p>
@@ -164,31 +164,5 @@ function Index() {
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * Fade-in the login background once decoded. Prevents the "blank flash" while
- * the JPEG downloads on slow networks and keeps the login path lighter on
- * initial paint (skeleton is CSS-only, no additional network requests).
- */
-function LoginBackground({ src }: { src: string }) {
-  const [loaded, setLoaded] = useState(false);
-  return (
-    <>
-      {!loaded && (
-        <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black animate-pulse" />
-      )}
-      <img
-        src={src}
-        alt="Clube Pirassununga"
-        loading="eager"
-        // @ts-expect-error - fetchpriority is a valid HTML attribute not yet in the React types
-        fetchpriority="high"
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
-      />
-    </>
   );
 }
