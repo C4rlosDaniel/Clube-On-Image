@@ -16,6 +16,7 @@ import { Route as TerminalIdRouteImport } from './routes/terminal.$id'
 import { Route as AppTerminalsRouteImport } from './routes/app.terminals'
 import { Route as AppPreviewRouteImport } from './routes/app.preview'
 import { Route as AppPresentationsRouteImport } from './routes/app.presentations'
+import { Route as AppNewsRouteImport } from './routes/app.news'
 import { Route as AppLibraryRouteImport } from './routes/app.library'
 
 const AppRoute = AppRouteImport.update({
@@ -53,6 +54,11 @@ const AppPresentationsRoute = AppPresentationsRouteImport.update({
   path: '/presentations',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNewsRoute = AppNewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppLibraryRoute = AppLibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/library': typeof AppLibraryRoute
+  '/app/news': typeof AppNewsRoute
   '/app/presentations': typeof AppPresentationsRoute
   '/app/preview': typeof AppPreviewRoute
   '/app/terminals': typeof AppTerminalsRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app/library': typeof AppLibraryRoute
+  '/app/news': typeof AppNewsRoute
   '/app/presentations': typeof AppPresentationsRoute
   '/app/preview': typeof AppPreviewRoute
   '/app/terminals': typeof AppTerminalsRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/library': typeof AppLibraryRoute
+  '/app/news': typeof AppNewsRoute
   '/app/presentations': typeof AppPresentationsRoute
   '/app/preview': typeof AppPreviewRoute
   '/app/terminals': typeof AppTerminalsRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/library'
+    | '/app/news'
     | '/app/presentations'
     | '/app/preview'
     | '/app/terminals'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app/library'
+    | '/app/news'
     | '/app/presentations'
     | '/app/preview'
     | '/app/terminals'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/library'
+    | '/app/news'
     | '/app/presentations'
     | '/app/preview'
     | '/app/terminals'
@@ -178,6 +190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPresentationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/news': {
+      id: '/app/news'
+      path: '/news'
+      fullPath: '/app/news'
+      preLoaderRoute: typeof AppNewsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/library': {
       id: '/app/library'
       path: '/library'
@@ -190,6 +209,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppLibraryRoute: typeof AppLibraryRoute
+  AppNewsRoute: typeof AppNewsRoute
   AppPresentationsRoute: typeof AppPresentationsRoute
   AppPreviewRoute: typeof AppPreviewRoute
   AppTerminalsRoute: typeof AppTerminalsRoute
@@ -198,6 +218,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppLibraryRoute: AppLibraryRoute,
+  AppNewsRoute: AppNewsRoute,
   AppPresentationsRoute: AppPresentationsRoute,
   AppPreviewRoute: AppPreviewRoute,
   AppTerminalsRoute: AppTerminalsRoute,
@@ -214,13 +235,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

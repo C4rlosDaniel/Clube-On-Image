@@ -3,21 +3,23 @@ import { useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PresentationPlayer } from "@/components/PresentationPlayer";
+import { TickerBar } from "@/components/TickerBar";
 
 export const Route = createFileRoute("/app/preview")({ component: Prev });
 
 function Prev() {
   const store = useStore();
-  const { presentations, terminals, media } = store;
+  const { presentations, terminals, media, tickerSettings } = store;
   const [presId, setPresId] = useState<string>(presentations[0]?.id ?? "");
   const [orient, setOrient] = useState<"h" | "v">("h");
   const pres = presentations.find((p) => p.id === presId);
+  const letterbox = tickerSettings.letterboxMode;
 
   return (
     <div className="space-y-5">
       <div className="flex justify-between flex-wrap gap-3 items-end">
         <div>
-          <h1 className="text-2xl font-bold">Preview em Tempo Real</h1>
+          <h1 className="text-2xl font-bold">PreView</h1>
           <p className="text-sm text-muted-foreground">Simulação de TV horizontal e vertical. Atualiza instantaneamente.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -34,8 +36,14 @@ function Prev() {
 
       {pres ? (
         <div className="flex justify-center ccp-anim-zoom">
-          <div className={`premium-border-gradient bg-black shadow-2xl overflow-hidden ${orient === "h" ? "w-full max-w-4xl aspect-video" : "h-[70vh] aspect-[9/16]"}`}>
-            <PresentationPlayer presentationId={presId} />
+          <div className={`relative premium-border-gradient bg-black shadow-2xl overflow-hidden ${orient === "h" ? "w-full max-w-4xl aspect-video" : "h-[70vh] aspect-[9/16]"}`}>
+            <div className="absolute inset-0 flex flex-col">
+              <div className="relative flex-1 min-h-0">
+                <PresentationPlayer presentationId={presId} />
+                {!letterbox && <TickerBar variant="overlay" />}
+              </div>
+              {letterbox && <TickerBar variant="inline" />}
+            </div>
           </div>
         </div>
       ) : (

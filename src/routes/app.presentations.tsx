@@ -5,6 +5,7 @@ import { useStore, createPresentation, updatePresentation, deletePresentation, a
 import { dialog } from "@/components/PremiumDialog";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { showSuccess } from "@/components/SuccessNeon";
 
 export const Route = createFileRoute("/app/presentations")({ component: Pres });
 
@@ -68,9 +69,13 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
     if (!files?.length) return;
     setUploading(true);
     try {
-      const added = await addMedia(files);
-      setDraft((d) => ({ ...d, mediaIds: [...d.mediaIds, ...added.map((a) => a.id)] }));
-      toast.success(`${added.length} mídia(s) enviada(s)`);
+      const result = await addMedia(files);
+      if (result.blocked) {
+        toast.error("Armazenamento da Biblioteca Cheio, Remova uma Imagem/Vídeo Para Fazer um Upload");
+        return;
+      }
+      setDraft((d) => ({ ...d, mediaIds: [...d.mediaIds, ...result.added.map((a) => a.id)] }));
+      toast.success(`${result.added.length} mídia(s) enviada(s)`);
     } finally { setUploading(false); }
   };
 
@@ -85,7 +90,7 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
         description: draft.description,
         transition: draft.transition,
       });
-      toast.success("Apresentação salva e sincronizada");
+      showSuccess("Apresentação Salva Com Sucesso");
     } catch (e) {
       toast.error("Falha ao salvar");
     } finally { setSaving(false); }
@@ -198,7 +203,11 @@ function Editor({ pres, media }: { pres: Presentation; media: Media[] }) {
 
       {preview && (
         <div onClick={() => setPreview(null)} className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-8 cursor-zoom-out">
-          {preview.type === "image" ? <img src={preview.url} className="max-h-full max-w-full object-contain" alt="" /> : <video src={preview.url} className="max-h-full max-w-full" controls autoPlay />}
+          <div className="relative max-h-full max-w-full">
+            {preview.type === "image"
+              ? <img src={preview.url} className="max-h-[85vh] max-w-full object-contain" alt="" />
+              : <video src={preview.url} className="max-h-[85vh] max-w-full" controls autoPlay />}
+          </div>
         </div>
       )}
     </div>

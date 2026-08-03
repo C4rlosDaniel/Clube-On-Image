@@ -5,6 +5,7 @@ import { useStore, createTerminal, updateTerminal, deleteTerminal, pingTerminal 
 import { dialog } from "@/components/PremiumDialog";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { showSuccess } from "@/components/SuccessNeon";
 
 export const Route = createFileRoute("/app/terminals")({ component: Terms });
 
@@ -32,19 +33,24 @@ function Terms() {
 
   const confirmSwap = async () => {
     if (!swap) return;
+    // Duration scales between 2s and 4s based on media count of the incoming presentation.
+    const nextPres = presentations.find((p) => p.id === swap.newPresId);
+    const mediaCount = nextPres?.mediaIds.length ?? 0;
+    const totalMs = Math.max(2000, Math.min(4000, 2000 + mediaCount * 120));
+    const step = totalMs / 4;
     setSwapping(true);
     try {
       setPhase("Preparando cache...");
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, step));
       setPhase("Validando arquivos...");
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, step));
       setPhase("Sincronizando com servidor...");
       await updateTerminal(swap.termId, { presentationId: swap.newPresId });
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, step));
       setPhase("Aplicando nos players conectados...");
       await pingTerminal(swap.termId);
-      await new Promise((r) => setTimeout(r, 1500));
-      toast.success("Apresentação aplicada em todos os players");
+      await new Promise((r) => setTimeout(r, step));
+      showSuccess("Terminal Atualizado Com Sucesso");
     } catch {
       toast.error("Falha ao trocar apresentação");
     } finally {
@@ -118,9 +124,16 @@ function Terms() {
                 <button onClick={() => openTerminal(t.id)} className="flex-1 flex items-center justify-center gap-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-xs font-medium">
                   <ExternalLink className="h-3 w-3" /> Abrir
                 </button>
-                <button onClick={() => pingTerminal(t.id)} className="flex items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs font-medium hover:bg-accent">
-                  <RefreshCw className="h-3 w-3" /> Atualizar
-                </button>
+                <RefreshBtn onRefresh={async () => {
+                  const pres = presentations.find((p) => p.id === t.presentationId);
+                  const mediaCount = pres?.mediaIds.length ?? 0;
+                  const totalMs = Math.max(2000, Math.min(4000, 2000 + mediaCount * 120));
+                  await Promise.all([
+                    pingTerminal(t.id),
+                    new Promise((r) => setTimeout(r, totalMs)),
+                  ]);
+                  showSuccess("Terminal Atualizado Com Sucesso");
+                }} />
                 <button onClick={() => updateTerminal(t.id, { active: !t.active })} className="flex items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs">
                   <Power className="h-3 w-3" />
                 </button>
@@ -174,5 +187,23 @@ function Terms() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function RefreshBtn({ onRefresh }: { onRefresh: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      disabled={busy}
+      onClick={async () => {
+        if (busy) return;
+        setBusy(true);
+        try { await onRefresh(); } finally { setBusy(false); }
+      }}
+      className="flex items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs font-medium hover:bg-accent disabled:opacity-70"
+    >
+      <RefreshCw className={`h-3 w-3 ${busy ? "animate-spin text-primary" : ""}`} />
+      {busy ? "Atualizando..." : "Atualizar"}
+    </button>
   );
 }

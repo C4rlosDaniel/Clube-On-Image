@@ -1,11 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState, useMemo } from "react";
-import { Upload, Trash2, Eye, Pencil, Check, X, Search, CheckSquare, Square, Clock } from "lucide-react";
-import { useStore, addMedia, deleteMediaFromLibrary, renameMedia, deleteMediaBulk, setAutoDeleteEnabled, type Media } from "@/lib/store";
+import { useRef, useState } from "react";
+import { Upload, Trash2, Eye, Pencil, Check, X, Search, CheckSquare, Square, Clock, HardDrive, AlertTriangle } from "lucide-react";
+import {
+  useStore, addMedia, renameMedia, deleteMediaBulk, setAutoDeleteEnabled,
+  getMediaTotalBytes, MEDIA_LIMIT_BYTES, MEDIA_WARN_BYTES, type Media,
+} from "@/lib/store";
 import { dialog } from "@/components/PremiumDialog";
 import { toast } from "sonner";
+import { showSuccess } from "@/components/SuccessNeon";
+import { BlockingLoader } from "@/components/BlockingLoader";
 
 export const Route = createFileRoute("/app/library")({ component: Lib });
+
+const BYTES_PER_MB = 1024 * 1024;
+const toMB = (b: number) => b / BYTES_PER_MB;
 
 function Lib() {
   const { media, autoDeleteEnabled } = useStore();
@@ -15,6 +23,14 @@ function Lib() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [processing, setProcessing] = useState<{ show: boolean; label: string }>({ show: false, label: "" });
+
+  const usedBytes = getMediaTotalBytes();
+  const usedMB = toMB(usedBytes);
+  const limitMB = toMB(MEDIA_LIMIT_BYTES);
+  const availableMB = Math.max(0, limitMB - usedMB);
+  const isWarn = usedBytes >= MEDIA_WARN_BYTES && usedBytes < MEDIA_LIMIT_BYTES;
+  const isFull = usedBytes >= MEDIA_LIMIT_BYTES;
 
   const filtered = media.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()));
   const allSelected = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
@@ -41,9 +57,37 @@ function Lib() {
       destructive: true,
     });
     if (!ok) return;
-    await deleteMediaBulk(ids);
-    clearAll();
-    toast.success(`${ids.length} item(ns) excluído(s)`);
+    setProcessing({ show: true, label: `Removendo ${ids.length} arquivo(s)...` });
+    try {
+      await deleteMediaBulk(ids);
+      clearAll();
+      showSuccess(`${ids.length} Mídia(s) Excluída(s)`);
+    } finally {
+      setProcessing({ show: false, label: "" });
+    }
+  };
+
+  const handleUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    // Client-side pre-check for a nicer error message before we even start.
+    const attempted = Array.from(files).reduce((a, f) => a + f.size, 0);
+    if (usedBytes + attempted > MEDIA_LIMIT_BYTES) {
+      toast.error("Armazenamento da Biblioteca Cheio, Remova uma Imagem/Vídeo Para Fazer um Upload");
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    setProcessing({ show: true, label: `Enviando ${files.length} arquivo(s)...` });
+    try {
+      const result = await addMedia(files);
+      if (result.blocked) {
+        toast.error("Armazenamento da Biblioteca Cheio, Remova uma Imagem/Vídeo Para Fazer um Upload");
+      } else if (result.added.length) {
+        showSuccess(`${result.added.length} Mídia(s) Enviada(s)`);
+      }
+    } finally {
+      setProcessing({ show: false, label: "" });
+      if (inputRef.current) inputRef.current.value = "";
+    }
   };
 
   const toggleAutoDelete = async (next: boolean) => {
@@ -53,6 +97,8 @@ function Lib() {
 
   return (
     <div className="space-y-6">
+      <BlockingLoader show={processing.show} label={processing.label} sublabel="Sincronizando com o servidor..." durationMs={3000} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Biblioteca de Mídias</h1>
@@ -63,11 +109,33 @@ function Lib() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..." className="rounded-md border bg-card pl-9 pr-3 py-2 text-sm w-64" />
           </div>
-          <input ref={inputRef} type="file" multiple accept="image/png,image/jpeg,image/jpg,image/webp,video/mp4" className="hidden" onChange={(e) => e.target.files && addMedia(e.target.files)} />
-          <button onClick={() => inputRef.current?.click()} className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
+          <input ref={inputRef} type="file" multiple accept="image/png,image/jpeg,image/jpg,image/webp,video/mp4" className="hidden" onChange={(e) => handleUpload(e.target.files)} />
+          <button onClick={() => inputRef.current?.click()} disabled={isFull} className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
             <Upload className="h-4 w-4" /> Enviar
           </button>
         </div>
+      </div>
+
+      {/* Storage indicator */}
+      <div className={`rounded-xl border-2 px-4 py-4 text-center space-y-1 ${isFull ? "border-red-500 bg-red-500/10" : isWarn ? "border-yellow-400 bg-yellow-400/10" : "border-red-500/60 bg-red-500/5"}`}>
+        <div className="flex items-center justify-center gap-2 text-red-500 font-bold text-base">
+          <HardDrive className="h-4 w-4" />
+          <span>Espaço Disponível: {availableMB.toFixed(1)} de {limitMB.toFixed(0)} MB</span>
+        </div>
+        <div className="text-red-500 font-semibold text-sm">
+          Quantidade Armazenada: {usedMB.toFixed(1)} MB
+        </div>
+        {isWarn && (
+          <div className="mt-2 flex items-center justify-center gap-2 text-yellow-500 text-xs">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Atenção: o armazenamento está próximo do limite ({Math.round((usedBytes / MEDIA_LIMIT_BYTES) * 100)}%).</span>
+          </div>
+        )}
+        {isFull && (
+          <div className="mt-2 text-red-600 text-xs font-semibold">
+            Armazenamento cheio. Remova uma imagem/vídeo para liberar espaço.
+          </div>
+        )}
       </div>
 
       {/* Toolbar: bulk actions + auto-delete toggle */}
@@ -136,9 +204,6 @@ function Lib() {
                 )}
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase text-muted-foreground">{m.type}</span>
-                <button onClick={async () => { if (await dialog.confirm({ title: "Excluir mídia?", description: "Ela será removida de todas as apresentações vinculadas.", confirmLabel: "Excluir", destructive: true })) { await deleteMediaFromLibrary(m.id); toast.success("Mídia excluída"); } }} className="text-destructive hover:opacity-80">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
             </div>
