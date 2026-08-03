@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useStore, type TickerMessage, type TickerSettings } from "@/lib/store";
 
@@ -35,16 +35,20 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
     return list;
   }, [tickerMessages, messagesOverride, terminalId]);
 
+  // Rotation: each message scrolls fully across the screen, then the next one
+  // starts. With a single message it simply repeats.
+  const [cycle, setCycle] = useState(0);
+  useEffect(() => { setCycle(0); }, [active.length]);
+
   if (!enabled || active.length === 0) return null;
 
-  const urgent = active.find((m) => m.priority);
-  const primary = urgent ?? active[0];
+  const primary = active[cycle % active.length];
 
   // Strip html for speed estimation
   const stripHtml = (h: string) => h.replace(/<[^>]*>/g, "");
-  const chain = active.map((m) => stripHtml(m.text)).join("     •     ");
+  const plain = stripHtml(primary.text);
   const speed = Math.max(0.1, Number(settings.scrollSpeed) || 1);
-  const baseSec = Math.max(20, Math.round(chain.length / 6));
+  const baseSec = Math.max(12, Math.round(plain.length / 5) + 8);
   const durationSec = baseSec / speed;
 
   // Manual font size (12..24px) chosen globally by the user. No auto formula.
@@ -85,15 +89,16 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
         style={{ background: bg, border: "2px solid #dc2626", borderRadius: 8 }}
       >
         <div
-          className="ccp-ticker-track flex items-center h-full whitespace-nowrap font-medium will-change-transform"
+          key={cycle}
+          className="ccp-ticker-single flex items-center h-full whitespace-nowrap font-medium will-change-transform"
           style={{
             animationDuration: `${durationSec}s`,
             fontSize: `${autoFont}px`,
             fontFamily: settings.fontFamily,
           }}
+          onAnimationEnd={() => setCycle((c) => c + 1)}
         >
-          <TickerContent messages={active} />
-          <TickerContent messages={active} />
+          <TickerContent messages={[primary]} />
         </div>
       </div>
     </div>
