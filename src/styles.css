@@ -286,6 +286,20 @@
   animation-iteration-count: infinite;
 }
 
+/* One message at a time: enters from the right, exits fully on the left. */
+@keyframes ccp-ticker-single {
+  0%   { transform: translate3d(100%, 0, 0); }
+  100% { transform: translate3d(-100%, 0, 0); }
+}
+.ccp-ticker-single {
+  animation-name: ccp-ticker-single;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  width: max-content;
+  min-width: 100%;
+}
+
 /* Success Neon toast — reused across the app */
 @keyframes ccp-success-in {
   from { opacity: 0; transform: translateX(24px) scale(0.96); }
