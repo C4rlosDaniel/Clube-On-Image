@@ -5,13 +5,18 @@ import { Lock, User, Monitor, LogIn, Zap, X } from "lucide-react";
 import { useStore, setSession } from "@/lib/store";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
-import loginBg from "@/assets/login-bg.jpg";
+import loginBg from "@/assets/login-bg.webp";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Entrar — ClubeON CCP" },
       { name: "description", content: "Acesse o painel de transmissão digital ClubeON CCP." },
+    ],
+    links: [
+      // Discovered in the initial HTML, so the browser starts fetching the
+      // background before the JS bundle renders the <img>.
+      { rel: "preload", as: "image", href: loginBg, fetchpriority: "high" } as any,
     ],
   }),
   component: Index,
