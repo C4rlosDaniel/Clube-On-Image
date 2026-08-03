@@ -333,7 +333,21 @@ export async function updateTickerSettings(patch: Partial<TickerSettings>) {
   if (patch.scrollSpeed !== undefined) db.ticker_scroll_speed = Math.max(TICKER_SPEED_MIN, Math.min(TICKER_SPEED_MAX, Number(patch.scrollSpeed)));
   if (patch.visibleAll !== undefined) db.ticker_visible_all = !!patch.visibleAll;
   if (patch.letterboxMode !== undefined) db.ticker_letterbox_mode = !!patch.letterboxMode;
-  await supabase.from("app_settings").update(db).eq("id", true);
+  const { data, error } = await supabase
+    .from("app_settings")
+    .update(db)
+    .eq("id", true)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    console.error("updateTickerSettings failed", error);
+    throw error;
+  }
+  if (data) {
+    state.autoDeleteEnabled = !!(data as any).auto_delete_enabled;
+    state.tickerSettings = mapSettings(data);
+    emit();
+  }
 }
 
 // ====== Library storage helpers ======

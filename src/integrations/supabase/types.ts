@@ -24,6 +24,7 @@ export type Database = {
           ticker_font_max: number
           ticker_font_min: number
           ticker_height_px: number
+          ticker_letterbox_mode: boolean
           ticker_scroll_speed: number
           ticker_visible_all: boolean
           updated_at: string
@@ -37,6 +38,7 @@ export type Database = {
           ticker_font_max?: number
           ticker_font_min?: number
           ticker_height_px?: number
+          ticker_letterbox_mode?: boolean
           ticker_scroll_speed?: number
           ticker_visible_all?: boolean
           updated_at?: string
@@ -50,6 +52,7 @@ export type Database = {
           ticker_font_max?: number
           ticker_font_min?: number
           ticker_height_px?: number
+          ticker_letterbox_mode?: boolean
           ticker_scroll_speed?: number
           ticker_visible_all?: boolean
           updated_at?: string
