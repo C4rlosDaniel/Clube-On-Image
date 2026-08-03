@@ -18,17 +18,71 @@ export type Database = {
         Row: {
           auto_delete_enabled: boolean
           id: boolean
+          ticker_bg_color: string
+          ticker_bg_opacity: number
+          ticker_font_family: string
+          ticker_font_max: number
+          ticker_font_min: number
+          ticker_height_px: number
+          ticker_scroll_speed: number
+          ticker_visible_all: boolean
           updated_at: string
         }
         Insert: {
           auto_delete_enabled?: boolean
           id?: boolean
+          ticker_bg_color?: string
+          ticker_bg_opacity?: number
+          ticker_font_family?: string
+          ticker_font_max?: number
+          ticker_font_min?: number
+          ticker_height_px?: number
+          ticker_scroll_speed?: number
+          ticker_visible_all?: boolean
           updated_at?: string
         }
         Update: {
           auto_delete_enabled?: boolean
           id?: boolean
+          ticker_bg_color?: string
+          ticker_bg_opacity?: number
+          ticker_font_family?: string
+          ticker_font_max?: number
+          ticker_font_min?: number
+          ticker_height_px?: number
+          ticker_scroll_speed?: number
+          ticker_visible_all?: boolean
           updated_at?: string
+        }
+        Relationships: []
+      }
+      layouts: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_builtin: boolean
+          name: string
+          updated_at: string
+          zones: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_builtin?: boolean
+          name: string
+          updated_at?: string
+          zones?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_builtin?: boolean
+          name?: string
+          updated_at?: string
+          zones?: Json
         }
         Relationships: []
       }
@@ -37,6 +91,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          size_bytes: number
           storage_path: string | null
           type: string
           url: string
@@ -45,6 +100,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          size_bytes?: number
           storage_path?: string | null
           type: string
           url: string
@@ -53,6 +109,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          size_bytes?: number
           storage_path?: string | null
           type?: string
           url?: string
@@ -65,35 +122,49 @@ export type Database = {
           description: string
           duration_ms: number
           id: string
+          layout_id: string | null
           loop: boolean
           media_ids: string[]
           name: string
           transition: string
           updated_at: string
+          zones: Json
         }
         Insert: {
           created_at?: string
           description?: string
           duration_ms?: number
           id?: string
+          layout_id?: string | null
           loop?: boolean
           media_ids?: string[]
           name: string
           transition?: string
           updated_at?: string
+          zones?: Json
         }
         Update: {
           created_at?: string
           description?: string
           duration_ms?: number
           id?: string
+          layout_id?: string | null
           loop?: boolean
           media_ids?: string[]
           name?: string
           transition?: string
           updated_at?: string
+          zones?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "presentations_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "layouts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       terminals: {
         Row: {
@@ -105,6 +176,7 @@ export type Database = {
           presentation_id: string | null
           refresh_token: number
           resolution: string
+          show_ticker: boolean
         }
         Insert: {
           active?: boolean
@@ -115,6 +187,7 @@ export type Database = {
           presentation_id?: string | null
           refresh_token?: number
           resolution?: string
+          show_ticker?: boolean
         }
         Update: {
           active?: boolean
@@ -125,6 +198,7 @@ export type Database = {
           presentation_id?: string | null
           refresh_token?: number
           resolution?: string
+          show_ticker?: boolean
         }
         Relationships: [
           {
@@ -135,6 +209,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ticker_messages: {
+        Row: {
+          active: boolean
+          color: string
+          created_at: string
+          ends_at: string | null
+          id: string
+          label: string
+          order_index: number
+          priority: boolean
+          starts_at: string | null
+          terminal_ids: string[]
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          color?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          label?: string
+          order_index?: number
+          priority?: boolean
+          starts_at?: string | null
+          terminal_ids?: string[]
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          color?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          label?: string
+          order_index?: number
+          priority?: boolean
+          starts_at?: string | null
+          terminal_ids?: string[]
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
