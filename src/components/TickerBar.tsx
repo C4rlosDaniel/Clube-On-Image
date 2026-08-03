@@ -129,7 +129,7 @@ function TickerContent({ messages }: { messages: TickerMessage[] }) {
             </span>
           )}
           <span className="px-1" dangerouslySetInnerHTML={{ __html: m.text }} />
-          <span className="mx-6 text-black/30">•</span>
+          {i < messages.length - 1 && <span className="mx-6 text-black/30">•</span>}
         </span>
       ))}
     </div>
