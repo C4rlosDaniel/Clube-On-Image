@@ -185,7 +185,7 @@ function Index() {
         </div>
       </div>
       <div className="hidden md:block relative">
-        <LoginBackground src={bgSrc} />
+        <LoginBackground slides={BG_SLIDES} />
         <div className="absolute inset-0 bg-gradient-to-l from-transparent via-black/40 to-[#0b0b0d]" />
         <div className="absolute bottom-8 left-8 right-8 text-right">
           <p className="text-xs uppercase tracking-widest text-white/60">Clube Pirassununga · 1928</p>
