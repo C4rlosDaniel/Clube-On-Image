@@ -91,7 +91,9 @@ export const TICKER_SPEED_MAX = 8.0;
 
 // Manual text-size range for the ticker (px).
 export const TICKER_FONT_MIN = 12;
-export const TICKER_FONT_MAX = 24;
+export const TICKER_FONT_MAX = 64;
+/** Word-like common sizes offered in the global ticker settings. */
+export const TICKER_FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64];
 
 // Library storage cap (hard limit).
 export const MEDIA_LIMIT_BYTES = 500 * 1024 * 1024; // 500 MB
