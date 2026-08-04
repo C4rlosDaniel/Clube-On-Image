@@ -6,6 +6,9 @@ import { useStore, setSession } from "@/lib/store";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import loginBg from "@/assets/login-bg.webp";
+import neonBgAsset from "@/assets/login-bg-neon.png.asset.json";
+
+const neonBg = neonBgAsset.url;
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,7 +19,8 @@ export const Route = createFileRoute("/")({
     links: [
       // Discovered in the initial HTML, so the browser starts fetching the
       // background before the JS bundle renders the <img>.
-      { rel: "preload", as: "image", href: loginBg, fetchpriority: "high" } as any,
+      { rel: "preload", as: "image", href: neonBg, fetchpriority: "high" } as any,
+      { rel: "prefetch", as: "image", href: loginBg } as any,
     ],
   }),
   component: Index,
@@ -33,6 +37,15 @@ function Index() {
   const [err, setErr] = useState("");
   const [setDefault, setSetDefault] = useState(true);
   const [defaultId, setDefaultId] = useState<string | null>(null);
+  // 1ª visita → arte neon; visitas seguintes → foto da sede.
+  const [bgSrc, setBgSrc] = useState<string>(neonBg);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const seen = localStorage.getItem("ccp_login_bg_seen");
+    if (seen) setBgSrc(loginBg);
+    else localStorage.setItem("ccp_login_bg_seen", "1");
+  }, []);
 
   // Auto-launch saved default terminal (skip with ?menu=1)
   useEffect(() => {
@@ -161,7 +174,7 @@ function Index() {
         </div>
       </div>
       <div className="hidden md:block relative">
-        <LoginBackground src={loginBg} />
+        <LoginBackground src={bgSrc} />
         <div className="absolute inset-0 bg-gradient-to-l from-transparent via-black/40 to-[#0b0b0d]" />
         <div className="absolute bottom-8 left-8 right-8 text-right">
           <p className="text-xs uppercase tracking-widest text-white/60">Clube Pirassununga · 1928</p>
@@ -179,12 +192,14 @@ function Index() {
  */
 function LoginBackground({ src }: { src: string }) {
   const [loaded, setLoaded] = useState(false);
+  useEffect(() => setLoaded(false), [src]);
   return (
     <>
       {!loaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black animate-pulse" />
       )}
       <img
+        key={src}
         src={src}
         alt="Clube Pirassununga"
         loading="eager"
