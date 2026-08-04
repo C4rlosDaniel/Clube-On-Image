@@ -424,12 +424,29 @@ function GlobalSettingsPanel({ settings, onProcessing, onDone }: GlobalPanelProp
               onChange={(e) => setFontSize(Number(e.target.value))}
               className="w-full mt-1 rounded border bg-background px-2 py-2 text-sm"
             >
-              {Array.from({ length: TICKER_FONT_MAX - TICKER_FONT_MIN + 1 }, (_, i) => TICKER_FONT_MIN + i).map((s) => (
+              {TICKER_FONT_SIZES.map((s) => (
                 <option key={s} value={s}>{s}px</option>
               ))}
             </select>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="range"
+                min={TICKER_FONT_MIN} max={TICKER_FONT_MAX} step={2}
+                value={draft.fontMax}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <input
+                type="number"
+                min={TICKER_FONT_MIN} max={TICKER_FONT_MAX} step={1}
+                value={draft.fontMax}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="w-20 rounded border bg-background px-2 py-1 text-xs text-center"
+              />
+              <span className="text-[10px] text-muted-foreground">px</span>
+            </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              Tamanho fixo, global. Se o texto ficar apertado, aumente a altura da faixa.
+              De {TICKER_FONT_MIN}px até {TICKER_FONT_MAX}px. A caixa da faixa mantém largura e altura fixas — o texto apenas ocupa mais espaço na rolagem.
             </p>
           </div>
 
