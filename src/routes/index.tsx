@@ -7,8 +7,28 @@ import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import loginBg from "@/assets/login-bg.webp";
 import neonBgAsset from "@/assets/login-bg-neon.png.asset.json";
+import img6 from "@/assets/ccp-image-6.png.asset.json";
+import img7 from "@/assets/ccp-image-7.png.asset.json";
+import img8 from "@/assets/ccp-image-8.png.asset.json";
+import img9 from "@/assets/ccp-image-9.png.asset.json";
+import img10 from "@/assets/ccp-image-10.png.asset.json";
+import img11 from "@/assets/ccp-image-11.png.asset.json";
+import img12 from "@/assets/ccp-image-12.png.asset.json";
 
 const neonBg = neonBgAsset.url;
+
+/** Ordem de exibição do carrossel (na ordem de envio das imagens). */
+const BG_SLIDES: string[] = [
+  neonBg,
+  img6.url,
+  img7.url,
+  img8.url,
+  img9.url,
+  img10.url,
+  img11.url,
+  img12.url,
+  loginBg,
+];
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -37,15 +57,6 @@ function Index() {
   const [err, setErr] = useState("");
   const [setDefault, setSetDefault] = useState(true);
   const [defaultId, setDefaultId] = useState<string | null>(null);
-  // 1ª visita → arte neon; visitas seguintes → foto da sede.
-  const [bgSrc, setBgSrc] = useState<string>(neonBg);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const seen = localStorage.getItem("ccp_login_bg_seen");
-    if (seen) setBgSrc(loginBg);
-    else localStorage.setItem("ccp_login_bg_seen", "1");
-  }, []);
 
   // Auto-launch saved default terminal (skip with ?menu=1)
   useEffect(() => {
@@ -174,7 +185,7 @@ function Index() {
         </div>
       </div>
       <div className="hidden md:block relative">
-        <LoginBackground src={bgSrc} />
+        <LoginBackground slides={BG_SLIDES} />
         <div className="absolute inset-0 bg-gradient-to-l from-transparent via-black/40 to-[#0b0b0d]" />
         <div className="absolute bottom-8 left-8 right-8 text-right">
           <p className="text-xs uppercase tracking-widest text-white/60">Clube Pirassununga · 1928</p>
@@ -186,29 +197,46 @@ function Index() {
 }
 
 /**
- * Fade-in the login background once decoded. Prevents the "blank flash" while
- * the JPEG downloads on slow networks and keeps the login path lighter on
- * initial paint (skeleton is CSS-only, no additional network requests).
+ * Carrossel de fundo com crossfade: cada slide é uma camada absoluta e apenas
+ * a ativa fica com opacity 1. Troca a cada 5s, transição de 1.2s ease-in-out.
+ * Pré-carrega o próximo slide para evitar "flash" branco.
  */
-function LoginBackground({ src }: { src: string }) {
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => setLoaded(false), [src]);
+function LoginBackground({ slides }: { slides: string[] }) {
+  const [index, setIndex] = useState(0);
+  const [firstLoaded, setFirstLoaded] = useState(false);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % slides.length), 5000);
+    return () => clearInterval(id);
+  }, [slides.length]);
+
+  // preload do próximo
+  useEffect(() => {
+    if (typeof window === "undefined" || slides.length < 2) return;
+    const next = new Image();
+    next.src = slides[(index + 1) % slides.length];
+  }, [index, slides]);
+
   return (
     <>
-      {!loaded && (
+      {!firstLoaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black animate-pulse" />
       )}
-      <img
-        key={src}
-        src={src}
-        alt="Clube Pirassununga"
-        loading="eager"
-        // @ts-expect-error - fetchpriority is a valid HTML attribute not yet in the React types
-        fetchpriority="high"
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
-      />
+      {slides.map((src, i) => (
+        <img
+          key={src}
+          src={src}
+          alt="Clube Pirassununga"
+          loading={i === 0 ? "eager" : "lazy"}
+          decoding="async"
+          onLoad={i === 0 ? () => setFirstLoaded(true) : undefined}
+          style={{ transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)" }}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[1200ms] ${
+            i === index && (i !== 0 || firstLoaded) ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
     </>
   );
 }
