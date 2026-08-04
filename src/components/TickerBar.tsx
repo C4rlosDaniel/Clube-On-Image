@@ -54,7 +54,8 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
   // Manual font size (12..24px) chosen globally by the user. No auto formula.
   // The user is responsible for increasing the bar height if the chosen size feels
   // too tight — the system no longer enforces the old 0.2cm padding rule.
-  const autoFont = Math.max(12, Math.min(24, Math.round(settings.fontMax || 16)));
+  const autoFont = Math.max(12, Math.min(64, Math.round(settings.fontMax || 16)));
+  // The label must never grow the fixed-height box: cap it and keep it compact.
   const labelFont = Math.max(11, Math.min(24, Math.round(autoFont * 0.95)));
 
   const bg = hexWithOpacity(settings.bgColor, settings.bgOpacity);
@@ -65,15 +66,21 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
 
   return (
     <div
-      className={`pointer-events-none ${positionClass} flex items-stretch ccp-ticker-shell`}
-      style={{ height: `${settings.heightPx}px`, fontFamily: settings.fontFamily }}
+      className={`pointer-events-none ${positionClass} flex items-stretch overflow-hidden ccp-ticker-shell`}
+      style={{
+        height: `${settings.heightPx}px`,
+        minHeight: `${settings.heightPx}px`,
+        maxHeight: `${settings.heightPx}px`,
+        fontFamily: settings.fontFamily,
+      }}
     >
       {/* Label */}
       <div
-        className="ccp-ticker-label flex items-center gap-2 font-bold uppercase tracking-widest text-white"
+        className="ccp-ticker-label flex shrink-0 items-center gap-2 overflow-hidden font-bold uppercase tracking-widest text-white"
         style={{
           background: primary.color,
           fontSize: `${labelFont}px`,
+          lineHeight: 1,
           letterSpacing: "0.18em",
           padding: `0 18px`,
           border: "2px solid rgba(255,255,255,0.95)",
@@ -94,6 +101,7 @@ export function TickerBar({ terminalId, settingsOverride, messagesOverride, vari
           style={{
             animationDuration: `${durationSec}s`,
             fontSize: `${autoFont}px`,
+            lineHeight: 1,
             fontFamily: settings.fontFamily,
           }}
           onAnimationEnd={() => setCycle((c) => c + 1)}
