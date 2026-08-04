@@ -7,8 +7,28 @@ import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import loginBg from "@/assets/login-bg.webp";
 import neonBgAsset from "@/assets/login-bg-neon.png.asset.json";
+import img6 from "@/assets/ccp-image-6.png.asset.json";
+import img7 from "@/assets/ccp-image-7.png.asset.json";
+import img8 from "@/assets/ccp-image-8.png.asset.json";
+import img9 from "@/assets/ccp-image-9.png.asset.json";
+import img10 from "@/assets/ccp-image-10.png.asset.json";
+import img11 from "@/assets/ccp-image-11.png.asset.json";
+import img12 from "@/assets/ccp-image-12.png.asset.json";
 
 const neonBg = neonBgAsset.url;
+
+/** Ordem de exibição do carrossel (na ordem de envio das imagens). */
+const BG_SLIDES: string[] = [
+  neonBg,
+  img6.url,
+  img7.url,
+  img8.url,
+  img9.url,
+  img10.url,
+  img11.url,
+  img12.url,
+  loginBg,
+];
 
 export const Route = createFileRoute("/")({
   head: () => ({
