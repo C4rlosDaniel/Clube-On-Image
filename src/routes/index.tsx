@@ -192,12 +192,14 @@ function Index() {
  */
 function LoginBackground({ src }: { src: string }) {
   const [loaded, setLoaded] = useState(false);
+  useEffect(() => setLoaded(false), [src]);
   return (
     <>
       {!loaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black animate-pulse" />
       )}
       <img
+        key={src}
         src={src}
         alt="Clube Pirassununga"
         loading="eager"
