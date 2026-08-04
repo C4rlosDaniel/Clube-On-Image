@@ -197,29 +197,46 @@ function Index() {
 }
 
 /**
- * Fade-in the login background once decoded. Prevents the "blank flash" while
- * the JPEG downloads on slow networks and keeps the login path lighter on
- * initial paint (skeleton is CSS-only, no additional network requests).
+ * Carrossel de fundo com crossfade: cada slide é uma camada absoluta e apenas
+ * a ativa fica com opacity 1. Troca a cada 5s, transição de 1.2s ease-in-out.
+ * Pré-carrega o próximo slide para evitar "flash" branco.
  */
-function LoginBackground({ src }: { src: string }) {
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => setLoaded(false), [src]);
+function LoginBackground({ slides }: { slides: string[] }) {
+  const [index, setIndex] = useState(0);
+  const [firstLoaded, setFirstLoaded] = useState(false);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % slides.length), 5000);
+    return () => clearInterval(id);
+  }, [slides.length]);
+
+  // preload do próximo
+  useEffect(() => {
+    if (typeof window === "undefined" || slides.length < 2) return;
+    const next = new Image();
+    next.src = slides[(index + 1) % slides.length];
+  }, [index, slides]);
+
   return (
     <>
-      {!loaded && (
+      {!firstLoaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black animate-pulse" />
       )}
-      <img
-        key={src}
-        src={src}
-        alt="Clube Pirassununga"
-        loading="eager"
-        // @ts-expect-error - fetchpriority is a valid HTML attribute not yet in the React types
-        fetchpriority="high"
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
-      />
+      {slides.map((src, i) => (
+        <img
+          key={src}
+          src={src}
+          alt="Clube Pirassununga"
+          loading={i === 0 ? "eager" : "lazy"}
+          decoding="async"
+          onLoad={i === 0 ? () => setFirstLoaded(true) : undefined}
+          style={{ transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)" }}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[1200ms] ${
+            i === index && (i !== 0 || firstLoaded) ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
     </>
   );
 }
