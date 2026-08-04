@@ -19,6 +19,7 @@ import {
   TICKER_SPEED_MAX,
   TICKER_FONT_MIN,
   TICKER_FONT_MAX,
+  TICKER_FONT_SIZES,
   PX_PER_CM,
   type TickerMessage,
   type TickerSettings,
