@@ -57,15 +57,6 @@ function Index() {
   const [err, setErr] = useState("");
   const [setDefault, setSetDefault] = useState(true);
   const [defaultId, setDefaultId] = useState<string | null>(null);
-  // 1ª visita → arte neon; visitas seguintes → foto da sede.
-  const [bgSrc, setBgSrc] = useState<string>(neonBg);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const seen = localStorage.getItem("ccp_login_bg_seen");
-    if (seen) setBgSrc(loginBg);
-    else localStorage.setItem("ccp_login_bg_seen", "1");
-  }, []);
 
   // Auto-launch saved default terminal (skip with ?menu=1)
   useEffect(() => {
