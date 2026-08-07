@@ -233,17 +233,47 @@ function mapTicker(row: any): TickerMessage {
   };
 }
 
+function mapZone(raw: any): SplitZone {
+  const z = raw ?? {};
+  return {
+    source: z.source === "presentation" ? "presentation" : "playlist",
+    presentationId: z.presentationId ?? null,
+    mediaIds: Array.isArray(z.mediaIds) ? z.mediaIds : [],
+    durationMs: Math.max(SPLIT_MIN_ITEM_SECONDS * 1000, Number(z.durationMs ?? 5000)),
+    transition: z.transition === "cut" ? "cut" : "fade",
+    letterbox: z.letterbox !== false,
+    fillStyle: z.fillStyle === "red" || z.fillStyle === "white" ? z.fillStyle : "blur",
+    description: z.description ?? "",
+  };
+}
+
+function mapSplit(row: any): SplitLayout {
+  return {
+    id: row.id,
+    name: row.name,
+    terminalId: row.terminal_id ?? null,
+    orientation: row.orientation === "horizontal_baixo" ? "horizontal_baixo" : "vertical_direita",
+    zone2Pct: Math.max(SPLIT_ZONE2_MIN, Math.min(SPLIT_ZONE2_MAX, Number(row.zone2_pct ?? 25))),
+    active: !!row.active,
+    zone1: mapZone(row.zone1),
+    zone2: mapZone(row.zone2),
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+  };
+}
+
 // ====== Initial load + realtime ======
 async function init() {
   if (initStarted) return initPromise!;
   initStarted = true;
   initPromise = (async () => {
-    const [mRes, pRes, tRes, sRes, kRes] = await Promise.all([
+    const [mRes, pRes, tRes, sRes, kRes, spRes] = await Promise.all([
       supabase.from("media").select("*").order("created_at", { ascending: false }),
       supabase.from("presentations").select("*").order("created_at", { ascending: false }),
       supabase.from("terminals").select("*").order("created_at", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", true).maybeSingle(),
       supabase.from("ticker_messages").select("*").order("order_index", { ascending: true }),
+      supabase.from("split_layouts").select("*").order("created_at", { ascending: false }),
     ]);
     if (mRes.data) state.media = await Promise.all(mRes.data.map(mapMediaRow));
     if (pRes.data) state.presentations = pRes.data.map(mapPres);
@@ -253,6 +283,7 @@ async function init() {
       state.tickerSettings = mapSettings(sRes.data);
     }
     if (kRes.data) state.tickerMessages = kRes.data.map(mapTicker);
+    if (spRes.data) state.splitLayouts = spRes.data.map(mapSplit);
     state.ready = true;
     emit();
 
@@ -330,6 +361,21 @@ async function init() {
           state.tickerMessages.sort((a, b) => a.orderIndex - b.orderIndex);
         } else if (payload.eventType === "DELETE") {
           state.tickerMessages = state.tickerMessages.filter((x) => x.id !== (payload.old as any).id);
+        }
+        emit();
+      })
+      .subscribe();
+
+    supabase
+      .channel("ccp-split")
+      .on("postgres_changes", { event: "*", schema: "public", table: "split_layouts" }, (payload) => {
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          const l = mapSplit(payload.new);
+          const idx = state.splitLayouts.findIndex((x) => x.id === l.id);
+          if (idx >= 0) state.splitLayouts[idx] = l;
+          else state.splitLayouts.unshift(l);
+        } else if (payload.eventType === "DELETE") {
+          state.splitLayouts = state.splitLayouts.filter((x) => x.id !== (payload.old as any).id);
         }
         emit();
       })
