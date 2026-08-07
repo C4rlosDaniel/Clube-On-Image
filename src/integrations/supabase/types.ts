@@ -94,6 +94,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          origin_tag: string
           size_bytes: number
           storage_path: string | null
           type: string
@@ -103,6 +104,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          origin_tag?: string
           size_bytes?: number
           storage_path?: string | null
           type: string
@@ -112,6 +114,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          origin_tag?: string
           size_bytes?: number
           storage_path?: string | null
           type?: string
@@ -165,6 +168,53 @@ export type Database = {
             columns: ["layout_id"]
             isOneToOne: false
             referencedRelation: "layouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      split_layouts: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          orientation: string
+          terminal_id: string | null
+          updated_at: string
+          zone1: Json
+          zone2: Json
+          zone2_pct: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          orientation?: string
+          terminal_id?: string | null
+          updated_at?: string
+          zone1?: Json
+          zone2?: Json
+          zone2_pct?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          orientation?: string
+          terminal_id?: string | null
+          updated_at?: string
+          zone1?: Json
+          zone2?: Json
+          zone2_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "split_layouts_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "terminals"
             referencedColumns: ["id"]
           },
         ]

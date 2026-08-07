@@ -10,6 +10,8 @@ export type Media = {
   storagePath: string | null;
   createdAt: number;
   sizeBytes: number;
+  /** Traceability tag, e.g. "SplitScreen — Zona 2" */
+  originTag?: string;
 };
 
 export type Presentation = {
@@ -47,11 +49,54 @@ export type TickerMessage = {
   createdAt: number;
 };
 
+// ====== SplitScreen ======
+export type SplitOrientation = "vertical_direita" | "horizontal_baixo";
+export type SplitZone = {
+  /** "presentation" = linked to an existing presentation (single source of truth) */
+  source: "presentation" | "playlist";
+  presentationId: string | null;
+  mediaIds: string[];
+  durationMs: number;
+  transition: "cut" | "fade";
+  letterbox: boolean;
+  /** Bar style used when letterbox is on */
+  fillStyle: "blur" | "red" | "white";
+  description: string;
+};
+export type SplitLayout = {
+  id: string;
+  name: string;
+  terminalId: string | null;
+  orientation: SplitOrientation;
+  zone2Pct: number;
+  active: boolean;
+  zone1: SplitZone;
+  zone2: SplitZone;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export const SPLIT_ZONE2_MIN = 15;
+export const SPLIT_ZONE2_MAX = 50;
+export const SPLIT_MIN_ITEM_SECONDS = 3;
+
+export const DEFAULT_SPLIT_ZONE: SplitZone = {
+  source: "playlist",
+  presentationId: null,
+  mediaIds: [],
+  durationMs: 5000,
+  transition: "fade",
+  letterbox: true,
+  fillStyle: "blur",
+  description: "",
+};
+
 export type AppState = {
   media: Media[];
   presentations: Presentation[];
   terminals: Terminal[];
   tickerMessages: TickerMessage[];
+  splitLayouts: SplitLayout[];
   ready: boolean;
   autoDeleteEnabled: boolean;
   tickerSettings: TickerSettings;
@@ -115,7 +160,7 @@ const BUCKET = "media";
 const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
 const state: AppState = {
-  media: [], presentations: [], terminals: [], tickerMessages: [],
+  media: [], presentations: [], terminals: [], tickerMessages: [], splitLayouts: [],
   ready: false, autoDeleteEnabled: false, tickerSettings: { ...DEFAULT_TICKER },
 };
 const listeners = new Set<(s: AppState) => void>();
@@ -123,7 +168,7 @@ let initStarted = false;
 let initPromise: Promise<void> | null = null;
 
 function emit() {
-  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], tickerSettings: { ...state.tickerSettings } };
+  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], splitLayouts: [...state.splitLayouts], tickerSettings: { ...state.tickerSettings } };
   listeners.forEach((l) => l(snap));
 }
 
@@ -146,6 +191,7 @@ async function mapMediaRow(row: any): Promise<Media> {
     storagePath: row.storage_path ?? null,
     createdAt: new Date(row.created_at).getTime(),
     sizeBytes: Number(row.size_bytes ?? 0),
+    originTag: row.origin_tag ?? "",
   };
 }
 
@@ -190,17 +236,47 @@ function mapTicker(row: any): TickerMessage {
   };
 }
 
+function mapZone(raw: any): SplitZone {
+  const z = raw ?? {};
+  return {
+    source: z.source === "presentation" ? "presentation" : "playlist",
+    presentationId: z.presentationId ?? null,
+    mediaIds: Array.isArray(z.mediaIds) ? z.mediaIds : [],
+    durationMs: Math.max(SPLIT_MIN_ITEM_SECONDS * 1000, Number(z.durationMs ?? 5000)),
+    transition: z.transition === "cut" ? "cut" : "fade",
+    letterbox: z.letterbox !== false,
+    fillStyle: z.fillStyle === "red" || z.fillStyle === "white" ? z.fillStyle : "blur",
+    description: z.description ?? "",
+  };
+}
+
+function mapSplit(row: any): SplitLayout {
+  return {
+    id: row.id,
+    name: row.name,
+    terminalId: row.terminal_id ?? null,
+    orientation: row.orientation === "horizontal_baixo" ? "horizontal_baixo" : "vertical_direita",
+    zone2Pct: Math.max(SPLIT_ZONE2_MIN, Math.min(SPLIT_ZONE2_MAX, Number(row.zone2_pct ?? 25))),
+    active: !!row.active,
+    zone1: mapZone(row.zone1),
+    zone2: mapZone(row.zone2),
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+  };
+}
+
 // ====== Initial load + realtime ======
 async function init() {
   if (initStarted) return initPromise!;
   initStarted = true;
   initPromise = (async () => {
-    const [mRes, pRes, tRes, sRes, kRes] = await Promise.all([
+    const [mRes, pRes, tRes, sRes, kRes, spRes] = await Promise.all([
       supabase.from("media").select("*").order("created_at", { ascending: false }),
       supabase.from("presentations").select("*").order("created_at", { ascending: false }),
       supabase.from("terminals").select("*").order("created_at", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", true).maybeSingle(),
       supabase.from("ticker_messages").select("*").order("order_index", { ascending: true }),
+      supabase.from("split_layouts").select("*").order("created_at", { ascending: false }),
     ]);
     if (mRes.data) state.media = await Promise.all(mRes.data.map(mapMediaRow));
     if (pRes.data) state.presentations = pRes.data.map(mapPres);
@@ -210,6 +286,7 @@ async function init() {
       state.tickerSettings = mapSettings(sRes.data);
     }
     if (kRes.data) state.tickerMessages = kRes.data.map(mapTicker);
+    if (spRes.data) state.splitLayouts = spRes.data.map(mapSplit);
     state.ready = true;
     emit();
 
@@ -287,6 +364,21 @@ async function init() {
           state.tickerMessages.sort((a, b) => a.orderIndex - b.orderIndex);
         } else if (payload.eventType === "DELETE") {
           state.tickerMessages = state.tickerMessages.filter((x) => x.id !== (payload.old as any).id);
+        }
+        emit();
+      })
+      .subscribe();
+
+    supabase
+      .channel("ccp-split")
+      .on("postgres_changes", { event: "*", schema: "public", table: "split_layouts" }, (payload) => {
+        if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          const l = mapSplit(payload.new);
+          const idx = state.splitLayouts.findIndex((x) => x.id === l.id);
+          if (idx >= 0) state.splitLayouts[idx] = l;
+          else state.splitLayouts.unshift(l);
+        } else if (payload.eventType === "DELETE") {
+          state.splitLayouts = state.splitLayouts.filter((x) => x.id !== (payload.old as any).id);
         }
         emit();
       })
@@ -370,7 +462,7 @@ export async function deleteMediaBulk(ids: string[]) {
 }
 
 export function useStore(): AppState {
-  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages] }));
+  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], splitLayouts: [...state.splitLayouts] }));
   useEffect(() => {
     const l = (n: AppState) => setS(n);
     listeners.add(l);
@@ -395,7 +487,7 @@ export function setSession(s: Session) {
 }
 
 // ====== Mutations ======
-export async function addMedia(files: FileList | File[]): Promise<AddMediaResult> {
+export async function addMedia(files: FileList | File[], originTag = ""): Promise<AddMediaResult> {
   const arr = Array.from(files);
   const attemptedBytes = arr.reduce((a, f) => a + f.size, 0);
   const used = getMediaTotalBytes();
@@ -411,7 +503,7 @@ export async function addMedia(files: FileList | File[]): Promise<AddMediaResult
     if (up.error) { console.error(up.error); continue; }
     const type: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
     const url = await signUrl(path);
-    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path, size_bytes: file.size }).select().single();
+    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path, size_bytes: file.size, origin_tag: originTag }).select().single();
     if (ins.error || !ins.data) { console.error(ins.error); continue; }
     const media: Media = { id: ins.data.id, name: ins.data.name, type, url, storagePath: path, createdAt: Date.now(), sizeBytes: file.size };
     out.push(media);
@@ -520,4 +612,67 @@ export async function deleteTickerMessage(id: string) {
 
 export async function reorderTickerMessages(orderedIds: string[]) {
   await Promise.all(orderedIds.map((id, i) => updateTickerMessage(id, { orderIndex: i })));
+}
+
+// ====== SplitScreen layouts ======
+export async function createSplitLayout(name: string): Promise<string | null> {
+  const ins = await supabase
+    .from("split_layouts")
+    .insert({
+      name,
+      orientation: "vertical_direita",
+      zone2_pct: 25,
+      active: false,
+      zone1: DEFAULT_SPLIT_ZONE as any,
+      zone2: DEFAULT_SPLIT_ZONE as any,
+    })
+    .select()
+    .single();
+  if (ins.error || !ins.data) { console.error(ins.error); return null; }
+  return ins.data.id;
+}
+
+export async function updateSplitLayout(id: string, patch: Partial<SplitLayout>) {
+  const db: any = {};
+  if (patch.name !== undefined) db.name = patch.name;
+  if (patch.terminalId !== undefined) db.terminal_id = patch.terminalId;
+  if (patch.orientation !== undefined) db.orientation = patch.orientation;
+  if (patch.zone2Pct !== undefined) db.zone2_pct = Math.max(SPLIT_ZONE2_MIN, Math.min(SPLIT_ZONE2_MAX, Math.round(patch.zone2Pct)));
+  if (patch.active !== undefined) db.active = patch.active;
+  if (patch.zone1 !== undefined) db.zone1 = patch.zone1;
+  if (patch.zone2 !== undefined) db.zone2 = patch.zone2;
+  const { error } = await supabase.from("split_layouts").update(db).eq("id", id);
+  if (error) throw error;
+  // Only one active layout per terminal
+  const terminalId = patch.terminalId !== undefined ? patch.terminalId : state.splitLayouts.find((l) => l.id === id)?.terminalId ?? null;
+  if (patch.active && terminalId) {
+    await supabase.from("split_layouts").update({ active: false }).eq("terminal_id", terminalId).neq("id", id);
+  }
+}
+
+export async function deleteSplitLayout(id: string) {
+  await supabase.from("split_layouts").delete().eq("id", id);
+}
+
+/** Active SplitScreen layout currently bound to a terminal, if any. */
+export function findActiveSplitForTerminal(layouts: SplitLayout[], terminalId: string | null | undefined) {
+  if (!terminalId) return null;
+  return layouts.find((l) => l.active && l.terminalId === terminalId) ?? null;
+}
+
+/** Resolve a zone into the effective media ids + timing (presentation = single source of truth). */
+export function resolveZone(zone: SplitZone, presentations: Presentation[]) {
+  if (zone.source === "presentation" && zone.presentationId) {
+    const p = presentations.find((x) => x.id === zone.presentationId);
+    if (p) {
+      return {
+        mediaIds: p.mediaIds,
+        durationMs: p.durationMs,
+        transition: (p.transition === "fade" ? "fade" : "fade") as "fade" | "cut",
+        loop: p.loop,
+      };
+    }
+    return { mediaIds: [] as string[], durationMs: zone.durationMs, transition: zone.transition, loop: true };
+  }
+  return { mediaIds: zone.mediaIds, durationMs: zone.durationMs, transition: zone.transition, loop: true };
 }
