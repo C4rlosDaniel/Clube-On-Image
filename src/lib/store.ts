@@ -158,7 +158,7 @@ const BUCKET = "media";
 const SIGNED_TTL = 60 * 60 * 24 * 7; // 7 days
 
 const state: AppState = {
-  media: [], presentations: [], terminals: [], tickerMessages: [],
+  media: [], presentations: [], terminals: [], tickerMessages: [], splitLayouts: [],
   ready: false, autoDeleteEnabled: false, tickerSettings: { ...DEFAULT_TICKER },
 };
 const listeners = new Set<(s: AppState) => void>();
@@ -166,7 +166,7 @@ let initStarted = false;
 let initPromise: Promise<void> | null = null;
 
 function emit() {
-  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], tickerSettings: { ...state.tickerSettings } };
+  const snap = { ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], splitLayouts: [...state.splitLayouts], tickerSettings: { ...state.tickerSettings } };
   listeners.forEach((l) => l(snap));
 }
 
