@@ -613,3 +613,66 @@ export async function deleteTickerMessage(id: string) {
 export async function reorderTickerMessages(orderedIds: string[]) {
   await Promise.all(orderedIds.map((id, i) => updateTickerMessage(id, { orderIndex: i })));
 }
+
+// ====== SplitScreen layouts ======
+export async function createSplitLayout(name: string): Promise<string | null> {
+  const ins = await supabase
+    .from("split_layouts")
+    .insert({
+      name,
+      orientation: "vertical_direita",
+      zone2_pct: 25,
+      active: false,
+      zone1: DEFAULT_SPLIT_ZONE as any,
+      zone2: DEFAULT_SPLIT_ZONE as any,
+    })
+    .select()
+    .single();
+  if (ins.error || !ins.data) { console.error(ins.error); return null; }
+  return ins.data.id;
+}
+
+export async function updateSplitLayout(id: string, patch: Partial<SplitLayout>) {
+  const db: any = {};
+  if (patch.name !== undefined) db.name = patch.name;
+  if (patch.terminalId !== undefined) db.terminal_id = patch.terminalId;
+  if (patch.orientation !== undefined) db.orientation = patch.orientation;
+  if (patch.zone2Pct !== undefined) db.zone2_pct = Math.max(SPLIT_ZONE2_MIN, Math.min(SPLIT_ZONE2_MAX, Math.round(patch.zone2Pct)));
+  if (patch.active !== undefined) db.active = patch.active;
+  if (patch.zone1 !== undefined) db.zone1 = patch.zone1;
+  if (patch.zone2 !== undefined) db.zone2 = patch.zone2;
+  const { error } = await supabase.from("split_layouts").update(db).eq("id", id);
+  if (error) throw error;
+  // Only one active layout per terminal
+  const terminalId = patch.terminalId !== undefined ? patch.terminalId : state.splitLayouts.find((l) => l.id === id)?.terminalId ?? null;
+  if (patch.active && terminalId) {
+    await supabase.from("split_layouts").update({ active: false }).eq("terminal_id", terminalId).neq("id", id);
+  }
+}
+
+export async function deleteSplitLayout(id: string) {
+  await supabase.from("split_layouts").delete().eq("id", id);
+}
+
+/** Active SplitScreen layout currently bound to a terminal, if any. */
+export function findActiveSplitForTerminal(layouts: SplitLayout[], terminalId: string | null | undefined) {
+  if (!terminalId) return null;
+  return layouts.find((l) => l.active && l.terminalId === terminalId) ?? null;
+}
+
+/** Resolve a zone into the effective media ids + timing (presentation = single source of truth). */
+export function resolveZone(zone: SplitZone, presentations: Presentation[]) {
+  if (zone.source === "presentation" && zone.presentationId) {
+    const p = presentations.find((x) => x.id === zone.presentationId);
+    if (p) {
+      return {
+        mediaIds: p.mediaIds,
+        durationMs: p.durationMs,
+        transition: (p.transition === "fade" ? "fade" : "fade") as "fade" | "cut",
+        loop: p.loop,
+      };
+    }
+    return { mediaIds: [] as string[], durationMs: zone.durationMs, transition: zone.transition, loop: true };
+  }
+  return { mediaIds: zone.mediaIds, durationMs: zone.durationMs, transition: zone.transition, loop: true };
+}
