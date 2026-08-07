@@ -47,11 +47,54 @@ export type TickerMessage = {
   createdAt: number;
 };
 
+// ====== SplitScreen ======
+export type SplitOrientation = "vertical_direita" | "horizontal_baixo";
+export type SplitZone = {
+  /** "presentation" = linked to an existing presentation (single source of truth) */
+  source: "presentation" | "playlist";
+  presentationId: string | null;
+  mediaIds: string[];
+  durationMs: number;
+  transition: "cut" | "fade";
+  letterbox: boolean;
+  /** Bar style used when letterbox is on */
+  fillStyle: "blur" | "red" | "white";
+  description: string;
+};
+export type SplitLayout = {
+  id: string;
+  name: string;
+  terminalId: string | null;
+  orientation: SplitOrientation;
+  zone2Pct: number;
+  active: boolean;
+  zone1: SplitZone;
+  zone2: SplitZone;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export const SPLIT_ZONE2_MIN = 15;
+export const SPLIT_ZONE2_MAX = 50;
+export const SPLIT_MIN_ITEM_SECONDS = 3;
+
+export const DEFAULT_SPLIT_ZONE: SplitZone = {
+  source: "playlist",
+  presentationId: null,
+  mediaIds: [],
+  durationMs: 5000,
+  transition: "fade",
+  letterbox: true,
+  fillStyle: "blur",
+  description: "",
+};
+
 export type AppState = {
   media: Media[];
   presentations: Presentation[];
   terminals: Terminal[];
   tickerMessages: TickerMessage[];
+  splitLayouts: SplitLayout[];
   ready: boolean;
   autoDeleteEnabled: boolean;
   tickerSettings: TickerSettings;
