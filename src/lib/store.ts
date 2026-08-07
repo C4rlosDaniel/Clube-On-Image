@@ -10,6 +10,8 @@ export type Media = {
   storagePath: string | null;
   createdAt: number;
   sizeBytes: number;
+  /** Traceability tag, e.g. "SplitScreen — Zona 2" */
+  originTag?: string;
 };
 
 export type Presentation = {
@@ -189,6 +191,7 @@ async function mapMediaRow(row: any): Promise<Media> {
     storagePath: row.storage_path ?? null,
     createdAt: new Date(row.created_at).getTime(),
     sizeBytes: Number(row.size_bytes ?? 0),
+    originTag: row.origin_tag ?? "",
   };
 }
 
