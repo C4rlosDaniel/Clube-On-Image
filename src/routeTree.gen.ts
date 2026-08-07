@@ -14,6 +14,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as TerminalIdRouteImport } from './routes/terminal.$id'
 import { Route as AppTerminalsRouteImport } from './routes/app.terminals'
+import { Route as AppSplitscreenRouteImport } from './routes/app.splitscreen'
 import { Route as AppPreviewRouteImport } from './routes/app.preview'
 import { Route as AppPresentationsRouteImport } from './routes/app.presentations'
 import { Route as AppNewsRouteImport } from './routes/app.news'
@@ -44,6 +45,11 @@ const AppTerminalsRoute = AppTerminalsRouteImport.update({
   path: '/terminals',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSplitscreenRoute = AppSplitscreenRouteImport.update({
+  id: '/splitscreen',
+  path: '/splitscreen',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPreviewRoute = AppPreviewRouteImport.update({
   id: '/preview',
   path: '/preview',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/app/news': typeof AppNewsRoute
   '/app/presentations': typeof AppPresentationsRoute
   '/app/preview': typeof AppPreviewRoute
+  '/app/splitscreen': typeof AppSplitscreenRoute
   '/app/terminals': typeof AppTerminalsRoute
   '/terminal/$id': typeof TerminalIdRoute
   '/app/': typeof AppIndexRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/app/news': typeof AppNewsRoute
   '/app/presentations': typeof AppPresentationsRoute
   '/app/preview': typeof AppPreviewRoute
+  '/app/splitscreen': typeof AppSplitscreenRoute
   '/app/terminals': typeof AppTerminalsRoute
   '/terminal/$id': typeof TerminalIdRoute
   '/app': typeof AppIndexRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/app/news': typeof AppNewsRoute
   '/app/presentations': typeof AppPresentationsRoute
   '/app/preview': typeof AppPreviewRoute
+  '/app/splitscreen': typeof AppSplitscreenRoute
   '/app/terminals': typeof AppTerminalsRoute
   '/terminal/$id': typeof TerminalIdRoute
   '/app/': typeof AppIndexRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/app/news'
     | '/app/presentations'
     | '/app/preview'
+    | '/app/splitscreen'
     | '/app/terminals'
     | '/terminal/$id'
     | '/app/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/app/news'
     | '/app/presentations'
     | '/app/preview'
+    | '/app/splitscreen'
     | '/app/terminals'
     | '/terminal/$id'
     | '/app'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/app/news'
     | '/app/presentations'
     | '/app/preview'
+    | '/app/splitscreen'
     | '/app/terminals'
     | '/terminal/$id'
     | '/app/'
@@ -176,6 +188,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTerminalsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/splitscreen': {
+      id: '/app/splitscreen'
+      path: '/splitscreen'
+      fullPath: '/app/splitscreen'
+      preLoaderRoute: typeof AppSplitscreenRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/preview': {
       id: '/app/preview'
       path: '/preview'
@@ -212,6 +231,7 @@ interface AppRouteChildren {
   AppNewsRoute: typeof AppNewsRoute
   AppPresentationsRoute: typeof AppPresentationsRoute
   AppPreviewRoute: typeof AppPreviewRoute
+  AppSplitscreenRoute: typeof AppSplitscreenRoute
   AppTerminalsRoute: typeof AppTerminalsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
@@ -221,6 +241,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNewsRoute: AppNewsRoute,
   AppPresentationsRoute: AppPresentationsRoute,
   AppPreviewRoute: AppPreviewRoute,
+  AppSplitscreenRoute: AppSplitscreenRoute,
   AppTerminalsRoute: AppTerminalsRoute,
   AppIndexRoute: AppIndexRoute,
 }
@@ -235,13 +256,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
