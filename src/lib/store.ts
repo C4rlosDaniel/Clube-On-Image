@@ -459,7 +459,7 @@ export async function deleteMediaBulk(ids: string[]) {
 }
 
 export function useStore(): AppState {
-  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages] }));
+  const [s, setS] = useState<AppState>(() => ({ ...state, media: [...state.media], presentations: [...state.presentations], terminals: [...state.terminals], tickerMessages: [...state.tickerMessages], splitLayouts: [...state.splitLayouts] }));
   useEffect(() => {
     const l = (n: AppState) => setS(n);
     listeners.add(l);
@@ -484,7 +484,7 @@ export function setSession(s: Session) {
 }
 
 // ====== Mutations ======
-export async function addMedia(files: FileList | File[]): Promise<AddMediaResult> {
+export async function addMedia(files: FileList | File[], originTag = ""): Promise<AddMediaResult> {
   const arr = Array.from(files);
   const attemptedBytes = arr.reduce((a, f) => a + f.size, 0);
   const used = getMediaTotalBytes();
@@ -500,7 +500,7 @@ export async function addMedia(files: FileList | File[]): Promise<AddMediaResult
     if (up.error) { console.error(up.error); continue; }
     const type: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
     const url = await signUrl(path);
-    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path, size_bytes: file.size }).select().single();
+    const ins = await supabase.from("media").insert({ name: file.name, type, url, storage_path: path, size_bytes: file.size, origin_tag: originTag }).select().single();
     if (ins.error || !ins.data) { console.error(ins.error); continue; }
     const media: Media = { id: ins.data.id, name: ins.data.name, type, url, storagePath: path, createdAt: Date.now(), sizeBytes: file.size };
     out.push(media);
