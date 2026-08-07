@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { LogOut, Pin, PinOff } from "lucide-react";
-import { useStore, setSession } from "@/lib/store";
+import { useStore, setSession, findActiveSplitForTerminal } from "@/lib/store";
 import { PresentationPlayer } from "@/components/PresentationPlayer";
+import { SplitScreenPlayer } from "@/components/SplitScreenPlayer";
 import { TickerBar } from "@/components/TickerBar";
 import logo from "@/assets/logo.png";
 import { toast } from "sonner";
@@ -12,8 +13,9 @@ export const Route = createFileRoute("/terminal/$id")({ component: TerminalScree
 function TerminalScreen() {
   const { id } = Route.useParams();
   const nav = useNavigate();
-  const { terminals, tickerSettings, tickerMessages } = useStore();
+  const { terminals, tickerSettings, tickerMessages, splitLayouts } = useStore();
   const terminal = terminals.find((t) => t.id === id);
+  const split = findActiveSplitForTerminal(splitLayouts, terminal?.id);
   const [showUI, setShowUI] = useState(false);
   const [pinned, setPinned] = useState(false);
 
@@ -113,7 +115,9 @@ function TerminalScreen() {
     <div onClick={toggleFs} className="h-screen w-screen bg-black overflow-hidden cursor-pointer relative flex flex-col">
       {/* Player fills the space above the ticker (letterbox, never cropped) */}
       <div className="relative flex-1 min-h-0">
-        <PresentationPlayer key={tick} presentationId={terminal.presentationId} />
+        {split
+          ? <SplitScreenPlayer key={`split:${split.id}:${split.updatedAt}`} layout={split} />
+          : <PresentationPlayer key={tick} presentationId={terminal.presentationId} />}
       </div>
       {/* Ticker reserves its own row only in letterbox mode; otherwise it overlays the media. */}
       {hasActiveTickerForThisTerminal && letterbox && (
@@ -145,7 +149,7 @@ function TerminalScreen() {
         </div>
       </div>
 
-      {!terminal.presentationId && (
+      {!terminal.presentationId && !split && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <div className="mx-auto mb-5 inline-flex rounded-full bg-white p-3 opacity-80">
